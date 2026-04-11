@@ -1,0 +1,8 @@
+{
+  "name": "sugarorange-api",
+  "version": "1.0.0",
+  "dependencies": {
+    "google-spreadsheet": "^4.1.1",
+    "google-auth-library": "^9.0.0"
+  }
+}

@@ -44,7 +44,7 @@ async function appendRow(token, values) {
 }
 
 async function getStockData(token) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/%E5%BA%AB%E5%AD%98%E6%8E%A7%E5%88%B6!B2:E2`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/%E5%BA%AB%E5%AD%98%E6%8E%A7%E5%88%B6!A2:E2`;
   const res = await fetch(url, {
     headers: { 'Authorization': 'Bearer ' + token }
   });
@@ -104,9 +104,9 @@ export default async function handler(req, res) {
       ]);
 
       const stockValues = await getStockData(token);
-      const price = Number(stockValues[0]);
-      const total = Number(stockValues[1]);
-      const sold = Number(stockValues[2]);
+      const price = Number(stockValues[1]);
+      const total = Number(stockValues[2]);
+      const sold = Number(stockValues[3]);
       const newSold = sold + qty;
       await updateStock(token, newSold, total - newSold);
 
@@ -131,8 +131,8 @@ export default async function handler(req, res) {
 
     } else {
       const stockValues = await getStockData(token);
-      const price = Number(stockValues[0]);
-      const remaining = Number(stockValues[3]);
+      const price = Number(stockValues[1]);
+      const remaining = Number(stockValues[4]);
       return res.json({ price, remaining });
     }
 

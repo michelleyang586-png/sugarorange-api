@@ -90,14 +90,14 @@ export default async function handler(req, res) {
     const action = req.query.action;
 
     if (action === 'order') {
-      const { lineName, lineUserId, phone, deliveryType, quantity, amount, address, note } = req.query;
+      const { lineName, recipientName, phone, deliveryType, quantity, amount, address, note, lineUserId } = req.query;
       const qty = parseInt(quantity);
       const amt = parseInt(amount);
       const orderId = 'ORD-' + Date.now();
       const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
 
       await appendRow(token, [
-        orderId, timestamp, lineName, phone, deliveryType,
+        orderId, timestamp, lineName + '（' + (recipientName || lineName) + '）', phone, deliveryType,
         qty, amt, address || '自取', note || '',
         deliveryType === '宅配' ? '待匯款' : '貨到付款',
         '待出貨'
@@ -115,7 +115,8 @@ export default async function handler(req, res) {
       const emoji = deliveryType === '宅配' ? '🚚' : '🏪';
       const msg = '📦 新訂單！\n' +
         '訂單編號：' + orderId + '\n' +
-        '姓名：' + lineName + '\n' +
+        'LINE帳號：' + lineName + '\n' +
+        '收件人：' + phone + '\n' +
         '電話：' + phone + '\n' +
         '取貨方式：' + emoji + ' ' + deliveryType + '\n' +
         '數量：' + qty + ' 盒\n' +

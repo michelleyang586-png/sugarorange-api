@@ -116,7 +116,7 @@ export default async function handler(req, res) {
       const msg = '📦 新訂單！\n' +
         '訂單編號：' + orderId + '\n' +
         'LINE帳號：' + lineName + '\n' +
-        '收件人：' + phone + '\n' +
+        '收件人：' + (recipientName || lineName) + '\n' +
         '電話：' + phone + '\n' +
         '取貨方式：' + emoji + ' ' + deliveryType + '\n' +
         '數量：' + qty + ' 盒\n' +

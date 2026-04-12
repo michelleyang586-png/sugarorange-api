@@ -34,7 +34,7 @@ async function readRange(token, range) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodedRange}`;
   const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
   const data = await res.json();
-  if (!data.values) throw new Error('讀取試算表失敗：' + JSON.stringify(data));
+  if (!data.values) return [];
   return data.values;
 }
 
@@ -56,6 +56,21 @@ async function appendRow(token, range, values) {
     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ values })
   });
+}
+
+async function generateOrderId(token, deliveryType) {
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const dateStr = yy + mm + dd;
+  const prefix = deliveryType === '宅配' ? 'D' : 'S';
+  const todayPrefix = prefix + dateStr;
+
+  const rows = await readRange(token, '訂單總表!A:A');
+  const todayCount = rows.filter(r => r[0] && r[0].startsWith(todayPrefix)).length;
+  const seq = String(todayCount + 1).padStart(3, '0');
+  return todayPrefix + '-' + seq;
 }
 
 async function sendLine(message) {
@@ -80,9 +95,10 @@ export default async function handler(req, res) {
       const { lineName, recipientName, phone, deliveryType, quantity, amount, address, note, lineUserId } = req.query;
       const qty = parseInt(quantity);
       const amt = parseInt(amount);
-      const orderId = 'ORD-' + Date.now();
-      const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
       const actualName = recipientName || lineName;
+
+      const orderId = await generateOrderId(token, deliveryType);
+      const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
 
       await appendRow(token, '訂單總表!A:L', [[
         orderId, timestamp,
@@ -91,8 +107,8 @@ export default async function handler(req, res) {
         phone, deliveryType, qty, amt,
         address || '自取', note || '',
         deliveryType === '宅配' ? '待匯款' : '貨到付款',
-    '待出貨'
-]]);
+        '待出貨'
+      ]]);
 
       const stockValues = await readRange(token, '庫存控制!B2:E2');
       const row = stockValues[0];

@@ -84,14 +84,15 @@ export default async function handler(req, res) {
       const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
       const actualName = recipientName || lineName;
 
-      await appendRow(token, '訂單總表!A:K', [[
+      await appendRow(token, '訂單總表!A:L', [[
         orderId, timestamp,
-        lineName + '（' + actualName + '）',
+        lineName,
+        actualName,
         phone, deliveryType, qty, amt,
         address || '自取', note || '',
         deliveryType === '宅配' ? '待匯款' : '貨到付款',
-        '待出貨'
-      ]]);
+    '待出貨'
+]]);
 
       const stockValues = await readRange(token, '庫存控制!B2:E2');
       const row = stockValues[0];

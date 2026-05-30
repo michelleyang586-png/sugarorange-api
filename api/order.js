@@ -1,5 +1,5 @@
 // ── 砂糖橘系統設定
-const LINE_TOKEN = 'YOUR_LINE_TOKEN_HERE'; // ← 如需 LINE 推播請填入
+const LINE_TOKEN = '2pgUy78YYeH/bf+gL4MyCWxiQYA2XtFUPzWwIigkRj3/JBHy5Ee6Z92uOBkTYgo9kZYp5mBCfLybgd9VVLLb7hTPqb9VE2Q2d1lYMVPV3euPtDKYEuinsN0LcuxXCtpm9MIS9dLqvVphxhCTETYZmAdB04t89/1O/w1cDnyilFU=';
 const SPREADSHEET_ID = '1o-qz74NpmMshMbFG3O9oCMPRQs8G2Rmr1HEBecUyvXo'; // 砂糖橘專用試算表
 const PICKUP_ADDRESS = '苗栗縣公館鄉館東村和東街46號（每日 09:00–17:00）';
 

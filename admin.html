@@ -354,8 +354,7 @@ function copyLabel(rowIndex){
     '寄：謝小姐 0937-331355',
     '苗栗縣公館鄉館東村和東街46號'
   ];
-  var text = lines.join('
-');
+  var text = lines.join('\n');
   navigator.clipboard.writeText(text).then(function(){
     var btn = document.getElementById('copy-btn-'+rowIndex);
     var orig = btn.textContent;

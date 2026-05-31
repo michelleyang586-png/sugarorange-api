@@ -256,7 +256,9 @@ function todayCard(o){
     '<div class="action-row">'+
     '<button class="btn-ship'+(o.shippedAt?' on':'')+'" onclick="toggleShip('+o.rowIndex+')">'+(o.shippedAt?'✓ 已出貨':'出貨')+'</button>'+
     '<button class="btn-paid'+(o.paidAt?' on':'')+'" onclick="togglePaid('+o.rowIndex+')">'+(o.paidAt?'✓ 已收款':'收款')+'</button>'+
-    '</div></div>';
+    '</div>'+
+    (o.type==='宅配' ? '<button id="copy-btn-'+o.rowIndex+'" onclick="copyLabel('+o.rowIndex+')" style="width:100%;margin-top:6px;padding:7px;border-radius:8px;border:1px solid #DDD;background:#F5F5F5;color:#555;font-size:12px;cursor:pointer;font-family:inherit">📋 複製出貨標籤</button>' : '')+
+    '</div>';
 }
 
 async function toggleShip(rowIndex){
@@ -328,6 +330,48 @@ function doSearch(){
       (o.paidAt?'🟢 已收款 '+o.paidAt:'🔲 未收款')+
       '</div></div>';
   }).join('');
+}
+
+function copyLabel(rowIndex){
+  var o = orders.find(function(x){return x.rowIndex===rowIndex;});
+  if(!o) return;
+  var d = o.shipDate ? (function(){
+    var p=o.shipDate.split('-');
+    var dt=new Date(+p[0],+p[1]-1,+p[2]);
+    return (dt.getMonth()+1)+'/'+dt.getDate();
+  })() : '待安排';
+  var text =
+    '餘有榮焉 砂糖橘
+' +
+    '──────────────
+' +
+    '收：' + o.name + '
+' +
+    '☎ ' + (o.phone||'—') + '
+' +
+    '📦 ' + o.address + '
+' +
+    '數量：' + o.qty + ' 盒（5斤裝）
+' +
+    '單號：' + o.orderId + '
+' +
+    '出貨日：' + d + '
+' +
+    '──────────────
+' +
+    '寄：謝小姐 0937-331355
+' +
+    '苗栗縣公館鄉館東村和東街46號';
+  navigator.clipboard.writeText(text).then(function(){
+    var btn = document.getElementById('copy-btn-'+rowIndex);
+    var orig = btn.textContent;
+    btn.textContent = '✓ 已複製！';
+    btn.style.background = '#1D9E75';
+    btn.style.color = 'white';
+    setTimeout(function(){ btn.textContent=orig; btn.style.background=''; btn.style.color=''; }, 2000);
+  }).catch(function(){
+    alert(text);
+  });
 }
 
 function typeTags(o){

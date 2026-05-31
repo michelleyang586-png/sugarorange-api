@@ -281,6 +281,62 @@ export default async function handler(req, res) {
       return res.json({ status: 'success', orderId, totalBoxes, remainStock: newRemain });
     }
 
+    // ── 後台：讀取所有訂單
+    if (action === 'getOrders') {
+      const rows = await readRange(token, '訂單總表!A:Q');
+      if (rows.length <= 1) return res.json({ status: 'success', orders: [] });
+      const orders = rows.slice(1).map((r, i) => ({
+        rowIndex: i + 2,
+        orderId:    r[0]  || '',
+        timestamp:  r[1]  || '',
+        lineName:   r[2]  || '',
+        name:       r[3]  || '',
+        phone:      r[4]  || '',
+        spec:       r[5]  || '',
+        type:       r[6]  || '',
+        qty:        Number(r[7]) || 0,
+        amount:     Number(r[8]) || 0,
+        address:    r[9]  || '',
+        note:       r[10] || '',
+        payStatus:  r[11] || '',
+        shipStatus: r[12] || '',
+        last5:      r[13] || '',
+        shipDate:   r[14] || '',
+        shippedAt:  r[15] || '',
+        paidAt:     r[16] || '',
+      }));
+      return res.json({ status: 'success', orders });
+    }
+
+    // ── 後台：安排出貨日（寫入 O 欄）
+    if (action === 'setShipDate') {
+      const { rowIndex, shipDate } = req.query;
+      await writeRange(token, `訂單總表!O${rowIndex}`, [[shipDate]]);
+      return res.json({ status: 'success' });
+    }
+
+    // ── 後台：勾出貨（寫入 P 欄 + 更新 M 欄）
+    if (action === 'markShipped') {
+      const { rowIndex, undo } = req.query;
+      const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+      const shippedAt = undo === '1' ? '' : now;
+      const shipStatus = undo === '1' ? '待出貨' : '已出貨';
+      await writeRange(token, `訂單總表!M${rowIndex}`, [[shipStatus]]);
+      await writeRange(token, `訂單總表!P${rowIndex}`, [[shippedAt]]);
+      return res.json({ status: 'success', shippedAt });
+    }
+
+    // ── 後台：勾收款（寫入 Q 欄 + 更新 L 欄）
+    if (action === 'markPaid') {
+      const { rowIndex, undo, deliveryType } = req.query;
+      const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+      const paidAt = undo === '1' ? '' : now;
+      const payStatus = undo === '1' ? (deliveryType === '宅配' ? '待匯款' : '貨到付款') : '已收款';
+      await writeRange(token, `訂單總表!L${rowIndex}`, [[payStatus]]);
+      await writeRange(token, `訂單總表!Q${rowIndex}`, [[paidAt]]);
+      return res.json({ status: 'success', paidAt });
+    }
+
     return res.json({ totalStock, soldStock, remainStock, specs });
 
   } catch (err) {

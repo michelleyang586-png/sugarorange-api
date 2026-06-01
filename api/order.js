@@ -190,12 +190,15 @@ export default async function handler(req, res) {
       // O 預計出貨日(後台排) | P 🟠出貨日期(後台自動) | Q 🟢收款日期(後台自動)
       let firstRowIndex = null;
       for (const row of orderItems) {
-        const result = await appendRow(token, '訂單總表!A:Q', [[
+        const result = await appendRow(token, '訂單總表!A:R', [[
           orderId, timestamp, lineName, actualName, phone,
           row.item.name, deliveryType, row.qty, row.itemAmount,
           address || '自取', note || '',
           deliveryType === '宅配' ? '待匯款' : '貨到付款',
-          '待出貨', '', '', '', ''
+          '待出貨', '', amt, '', '', ''
+          // A訂單編號 B時間 C LINE D收件人 E電話 F規格 G取貨方式
+          // H數量 I商品金額 J地址 K備註 L付款狀態 M出貨狀態 N後五碼
+          // O總金額(含運費) P預計出貨日 Q🟠出貨日期 R🟢收款日期
         ]]);
         if (firstRowIndex === null) {
           const match = result.updates.updatedRange.match(/A(\d+):/);
@@ -284,7 +287,7 @@ export default async function handler(req, res) {
     // ── 後台：讀取所有訂單
     if (action === 'getOrders') {
       const rows = await readRange(token, '訂單總表!A:Q');
-      if (rows.length <= 1) return res.json({ status: 'success', orders: [] });
+      if (rows.length < 2) return res.json({ status: 'success', orders: [] });
       const orders = rows.slice(1).map((r, i) => ({
         rowIndex: i + 2,
         orderId:    r[0]  || '',
@@ -295,15 +298,16 @@ export default async function handler(req, res) {
         spec:       r[5]  || '',
         type:       r[6]  || '',
         qty:        Number(r[7]) || 0,
-        amount:     Number(r[8]) || 0,
+        amount:     Number(r[8]) || 0,  // I欄：商品金額
         address:    r[9]  || '',
         note:       r[10] || '',
         payStatus:  r[11] || '',
         shipStatus: r[12] || '',
         last5:      r[13] || '',
-        shipDate:   r[14] || '',
-        shippedAt:  r[15] || '',
-        paidAt:     r[16] || '',
+        totalAmount: Number(r[14]) || 0, // O欄：總金額含運費
+        shipDate:   r[15] || '',         // P欄：預計出貨日
+        shippedAt:  r[16] || '',         // Q欄：出貨日期
+        paidAt:     r[17] || '',         // R欄：收款日期
       }));
       return res.json({ status: 'success', orders });
     }
@@ -311,7 +315,7 @@ export default async function handler(req, res) {
     // ── 後台：安排出貨日（寫入 O 欄）
     if (action === 'setShipDate') {
       const { rowIndex, shipDate } = req.query;
-      await writeRange(token, `訂單總表!O${rowIndex}`, [[shipDate]]);
+      await writeRange(token, `訂單總表!P${rowIndex}`, [[shipDate]]);
       return res.json({ status: 'success' });
     }
 
@@ -322,7 +326,7 @@ export default async function handler(req, res) {
       const shippedAt = undo === '1' ? '' : now;
       const shipStatus = undo === '1' ? '待出貨' : '已出貨';
       await writeRange(token, `訂單總表!M${rowIndex}`, [[shipStatus]]);
-      await writeRange(token, `訂單總表!P${rowIndex}`, [[shippedAt]]);
+      await writeRange(token, `訂單總表!Q${rowIndex}`, [[shippedAt]]);
       return res.json({ status: 'success', shippedAt });
     }
 
@@ -333,7 +337,7 @@ export default async function handler(req, res) {
       const paidAt = undo === '1' ? '' : now;
       const payStatus = undo === '1' ? (deliveryType === '宅配' ? '待匯款' : '貨到付款') : '已收款';
       await writeRange(token, `訂單總表!L${rowIndex}`, [[payStatus]]);
-      await writeRange(token, `訂單總表!Q${rowIndex}`, [[paidAt]]);
+      await writeRange(token, `訂單總表!R${rowIndex}`, [[paidAt]]);
       return res.json({ status: 'success', paidAt });
     }
 

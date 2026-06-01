@@ -5,7 +5,8 @@ const PICKUP_ADDRESS = '苗栗縣公館鄉館東村和東街46號（每日 09:00
 
 // ── Telegram 設定（與水蜜桃共用）
 const TELEGRAM_TOKEN = '8667366687:AAE8B2mgPmiFUVo1VfOSoCJ5EjGwayaI7J0';
-const TELEGRAM_CHAT_ID = '7588402543';
+const TELEGRAM_CHAT_ID = '7588402543';       // 管理員（你）
+const TELEGRAM_CHAT_ID_2 = '8991514370';    // 小幫手巧玲
 
 // ── 砂糖橘商品規格（只有一種，之後可增加）
 const specs = [
@@ -115,6 +116,12 @@ async function sendTelegram(message) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
   });
+  // 測試期間暫停小幫手通知，開賣前取消註解
+  // await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID_2, text: message })
+  // });
 }
 
 async function sendLineToCustomer(userId, message) {

@@ -57,24 +57,25 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 .loading{text-align:center;color:#BBB;font-size:14px;padding:30px 0}
 .print-area{display:none}
 @media print{
+  @page{ size:A4 landscape; margin:10mm; }
   body{max-width:100%}
-  .top-header,.tab-bar,.section{display:none!important}
+  .top-header,.tab-bar,.section,.print-btn-bar{display:none!important}
   #print-sheet{display:block!important}
 }
 #print-sheet{display:none}
 .print-btn-bar{padding:12px 14px 0}
 .print-all-btn{width:100%;padding:11px;background:#333;color:white;border:none;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;margin-bottom:4px}
 /* 列印樣式 */
-#print-sheet{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;padding:10px;font-size:13px}
-#print-sheet h2{font-size:15px;font-weight:700;margin-bottom:4px}
-#print-sheet .ps-meta{font-size:12px;color:#555;margin-bottom:10px}
-#print-sheet .ps-sec{font-size:12px;font-weight:700;background:#F0F0F0;padding:4px 8px;margin:10px 0 4px}
-#print-sheet table{width:100%;border-collapse:collapse;font-size:12px}
-#print-sheet th{border:1px solid #999;padding:4px 6px;background:#F5F5F5;text-align:left}
-#print-sheet td{border:1px solid #CCC;padding:5px 6px;vertical-align:top}
-#print-sheet .chk{width:24px;text-align:center}
-#print-sheet .ps-summary{display:flex;gap:16px;font-size:13px;margin-bottom:8px}
-#print-sheet .ps-day{font-weight:700;font-size:13px;margin:8px 0 4px;border-bottom:1px solid #999;padding-bottom:2px}
+#print-sheet{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;padding:10px;font-size:16px}
+#print-sheet h2{font-size:18px;font-weight:700;margin-bottom:4px}
+#print-sheet .ps-meta{font-size:13px;color:#555;margin-bottom:10px}
+#print-sheet table{width:100%;border-collapse:collapse;font-size:15px}
+#print-sheet th{border:1px solid #999;padding:6px 8px;background:#F0F0F0;text-align:left;font-size:14px}
+#print-sheet td{border:1px solid #CCC;padding:7px 8px;vertical-align:top}
+#print-sheet .chk{width:28px;text-align:center}
+#print-sheet .ps-day{font-weight:700;font-size:16px;margin:12px 0 5px;border-bottom:2px solid #999;padding-bottom:3px}
+#print-sheet .ps-type{font-size:13px;font-weight:600;margin:6px 0 3px;color:#555}
+#print-sheet .n2{font-size:13px;color:#666;margin-top:2px}
 </style>
 </head>
 <body>
@@ -401,13 +402,31 @@ function printAll(){
     groups[o.shipDate].push(o);
   });
 
-  function tableRows(list){
+  function pickupRows(list){
     return list.map(function(o){
       return '<tr>'+
         '<td class="chk">☐</td>'+
-        '<td><b>'+o.name+'</b>'+(o.phone?'<br><span style="font-size:11px;color:#666">'+o.phone+'</span>':'')+'</td>'+
-        '<td style="text-align:center"><b>'+o.qty+'</b></td>'+
-        '<td>'+(o.payStatus||'')+'</td>'+
+        '<td><b>'+o.name+'</b></td>'+
+        '<td><b>'+(o.name||'同左')+'</b></td>'+
+        '<td><span class="n2">'+(o.phone||'—')+'</span></td>'+
+        '<td style="text-align:center;font-weight:700">'+o.qty+'</td>'+
+        '<td>'+(o.payStatus||'現場收款')+'</td>'+
+        '<td>'+(o.note||'')+'</td>'+
+        '<td class="chk">☐</td>'+
+        '</tr>';
+    }).join('');
+  }
+
+  function deliveryRows(list){
+    return list.map(function(o){
+      return '<tr>'+
+        '<td class="chk">☐</td>'+
+        '<td><b>'+o.name+'</b></td>'+
+        '<td><b>'+(o.name||'同左')+'</b></td>'+
+        '<td><span class="n2">'+(o.phone||'—')+'</span></td>'+
+        '<td style="text-align:center;font-weight:700">'+o.qty+'</td>'+
+        '<td>'+(o.payStatus||'待匯款')+'</td>'+
+        '<td style="font-size:13px">'+(o.address||'')+'</td>'+
         '<td>'+(o.note||'')+'</td>'+
         '<td class="chk">☐</td>'+
         '</tr>';
@@ -417,14 +436,20 @@ function printAll(){
   function section(list, label){
     var pu = list.filter(function(o){return o.type==='自取';});
     var de = list.filter(function(o){return o.type==='宅配';});
-    var html = '<div class="ps-day">'+label+'　共 '+list.reduce(function(s,o){return s+o.qty;},0)+' 盒（自取'+pu.reduce(function(s,o){return s+o.qty;},0)+'／宅配'+de.reduce(function(s,o){return s+o.qty;},0)+'）</div>';
+    var puB = pu.reduce(function(s,o){return s+o.qty;},0);
+    var deB = de.reduce(function(s,o){return s+o.qty;},0);
+    var html = '<div class="ps-day">'+label+'　共 '+(puB+deB)+' 盒（自取 '+puB+' ／宅配 '+deB+'）</div>';
     if(pu.length){
-      html += '<div style="font-size:11px;font-weight:600;margin:4px 0 2px;color:#085041">▸ 自取</div>';
-      html += '<table><tr><th class="chk">出</th><th>姓名</th><th>盒數</th><th>收款</th><th>備註</th><th class="chk">收</th></tr>'+tableRows(pu)+'</table>';
+      html += '<div class="ps-type">🏪 自取（'+puB+' 盒）</div>';
+      html += '<table>'+
+        '<tr><th class="chk">出</th><th style="width:12%">訂購人</th><th style="width:12%">收件人</th><th style="width:11%">電話</th><th style="width:5%;text-align:center">盒</th><th style="width:10%">收款</th><th>備註</th><th class="chk">收</th></tr>'+
+        pickupRows(pu)+'</table>';
     }
     if(de.length){
-      html += '<div style="font-size:11px;font-weight:600;margin:6px 0 2px;color:#0C447C">▸ 宅配</div>';
-      html += '<table><tr><th class="chk">出</th><th>姓名</th><th>盒數</th><th>收款</th><th>備註</th><th class="chk">收</th></tr>'+tableRows(de)+'</table>';
+      html += '<div class="ps-type" style="margin-top:8px">🚛 宅配（'+deB+' 盒）</div>';
+      html += '<table>'+
+        '<tr><th class="chk">出</th><th style="width:10%">訂購人</th><th style="width:10%">收件人</th><th style="width:10%">電話</th><th style="width:4%;text-align:center">盒</th><th style="width:8%">收款</th><th style="width:22%">地址</th><th>備註</th><th class="chk">收</th></tr>'+
+        deliveryRows(de)+'</table>';
     }
     return html;
   }

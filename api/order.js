@@ -195,7 +195,7 @@ export default async function handler(req, res) {
           row.item.name, deliveryType, row.qty, row.itemAmount,
           address || '自取', note || '',
           deliveryType === '宅配' ? '待匯款' : '貨到付款',
-          '待出貨', '', amt, '', '', ''
+          '待出貨', '', 'NT$'+amt, '', '', ''
           // A訂單編號 B時間 C LINE D收件人 E電話 F規格 G取貨方式
           // H數量 I商品金額 J地址 K備註 L付款狀態 M出貨狀態 N後五碼
           // O總金額(含運費) P預計出貨日 Q🟠出貨日期 R🟢收款日期

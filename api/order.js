@@ -279,7 +279,7 @@ export default async function handler(req, res) {
       }
 
       await sendTelegram(adminMsg);
-      await sendLineToCustomer(req.query.lineUserId || '', customerMsg);
+      // await sendLineToCustomer(req.query.lineUserId || '', customerMsg); // 測試期間暫停LINE推播
 
       return res.json({ status: 'success', orderId, totalBoxes, remainStock: newRemain });
     }

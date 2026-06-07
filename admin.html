@@ -54,6 +54,8 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 .btn-paid{flex:1;padding:9px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid #BA7517;background:#FAEEDA;color:#633806}
 .btn-paid.on{background:#F5F5F5;border-color:#DDD;color:#999}
 .search-box{width:100%;border:1px solid #DDD;border-radius:10px;padding:10px 14px;font-size:15px;margin-bottom:12px;font-family:inherit;background:white}
+.filter-btn{border:1px solid #DDD;background:#F5F5F5;border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer;color:#666;font-family:inherit;transition:all .15s}
+.filter-btn.active{background:#F97316;border-color:#F97316;color:white;font-weight:500}
 .loading{text-align:center;color:#BBB;font-size:14px;padding:30px 0}
 .print-area{display:none}
 @media print{
@@ -132,6 +134,15 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 <!-- 查訂單 -->
 <div id="search" class="section">
   <input class="search-box" type="text" id="search-input" placeholder="輸入姓名或電話搜尋..." oninput="doSearch()">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    <button class="filter-btn active" onclick="setFilter('pay','all',this)" data-group="pay">💰 全部</button>
+    <button class="filter-btn" onclick="setFilter('pay','待匯款',this)" data-group="pay">待匯款</button>
+    <button class="filter-btn" onclick="setFilter('pay','已收款',this)" data-group="pay">已收款</button>
+    <div style="width:1px;background:#EEE;margin:0 2px"></div>
+    <button class="filter-btn active" onclick="setFilter('ship','all',this)" data-group="ship">📦 全部</button>
+    <button class="filter-btn" onclick="setFilter('ship','待出貨',this)" data-group="ship">待出貨</button>
+    <button class="filter-btn" onclick="setFilter('ship','已出貨',this)" data-group="ship">已出貨</button>
+  </div>
   <div id="search-results"></div>
 </div>
 
@@ -312,20 +323,45 @@ function renderUpcoming(){
 }
 
 // ── 查訂單
+var filterPay = 'all';
+var filterShip = 'all';
+
+function setFilter(group, val, btn){
+  if(group==='pay') filterPay = val;
+  if(group==='ship') filterShip = val;
+  document.querySelectorAll('.filter-btn[data-group="'+group+'"]').forEach(function(b){
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  doSearch();
+}
+
 function doSearch(){
   var q = document.getElementById('search-input').value.trim();
   var el = document.getElementById('search-results');
-  if(!q){ el.innerHTML=''; return; }
-  var res = orders.filter(function(o){return o.name.includes(q)||o.phone.includes(q)||o.orderId.includes(q);});
-  if(!res.length){ el.innerHTML='<div class="empty-msg">找不到「'+q+'」</div>'; return; }
+  var res = orders.filter(function(o){
+    var matchQ = !q || o.name.includes(q) || o.phone.includes(q) || o.orderId.includes(q);
+    var matchPay = filterPay==='all' ||
+      (filterPay==='待匯款' && o.payStatus==='待匯款') ||
+      (filterPay==='已收款' && o.paidAt);
+    var matchShip = filterShip==='all' ||
+      (filterShip==='待出貨' && !o.shippedAt) ||
+      (filterShip==='已出貨' && o.shippedAt);
+    return matchQ && matchPay && matchShip;
+  });
+  if(!res.length){
+    el.innerHTML='<div class="empty-msg">'+(q?'找不到「'+q+'」':'沒有符合條件的訂單')+'</div>';
+    return;
+  }
   el.innerHTML = res.map(function(o){
     var tags = typeTags(o);
     var note = o.note?'<div class="oc-note">📝 '+o.note+'</div>':'';
+    var addr = o.type==='宅配'?'<div class="oc-info" style="font-size:11px">📦 '+o.address+'</div>':'';
     return '<div class="ocard">'+
       '<div class="oc-top"><div class="oc-name">'+o.name+'</div><div class="oc-boxes">'+o.qty+' 盒</div></div>'+
       '<div class="oc-tags">'+tags+'</div>'+
       '<div class="oc-info">'+(o.phone?o.phone+' · ':'')+o.amount+'元 · '+(o.shipDate?fmtDisplay(parseD(o.shipDate)):'尚未安排出貨日')+'</div>'+
-      note+
+      addr+note+
       '<div class="oc-info" style="margin-top:4px">'+
       (o.shippedAt?'🟠 已出貨 '+o.shippedAt:'🔲 未出貨')+' &nbsp; '+
       (o.paidAt?'🟢 已收款 '+o.paidAt:'🔲 未收款')+

@@ -152,10 +152,11 @@ export default async function handler(req, res) {
     const action = req.query.action;
 
     // ── 庫存讀取
-    const stockRow = await readRange(token, '庫存控制!A2:C2');
+    const stockRow = await readRange(token, '庫存控制!A2:D2');
     const totalStock  = Number(stockRow[0]?.[0]) || 0;
     const soldStock   = Number(stockRow[0]?.[1]) || 0;
     const remainStock = Number(stockRow[0]?.[2]) || 0;
+    const stockLimit  = Number(stockRow[0]?.[3]) || 0; // D2：今日採收上限
 
     if (action === 'debug') {
       return res.json({ totalStock, soldStock, remainStock });
@@ -316,7 +317,14 @@ export default async function handler(req, res) {
         shippedAt:  r[16] || '',         // Q欄：出貨日期
         paidAt:     r[17] || '',         // R欄：收款日期
       }));
-      return res.json({ status: 'success', orders });
+      return res.json({ status: 'success', orders, stockLimit });
+    }
+
+    // ── 後台：設定今日採收上限（寫入 D2）
+    if (action === 'setStockLimit') {
+      const { limit } = req.query;
+      await writeRange(token, '庫存控制!D2', [[Number(limit) || 0]]);
+      return res.json({ status: 'success', stockLimit: Number(limit) || 0 });
     }
 
     // ── 後台：安排出貨日（寫入 O 欄）

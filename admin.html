@@ -28,6 +28,9 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 .ocard{background:white;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
 .ocard.done{opacity:.45}
 .ocard.no-date{border-left:3px solid #E24B4A}
+.ocard.big-order{border-left:4px solid #9333EA}
+.ocard.no-date.big-order{border-left:4px solid #9333EA;border-image:linear-gradient(to bottom,#9333EA 0%,#9333EA 50%,#E24B4A 50%,#E24B4A 100%) 1}
+.tag-big{background:#F3E8FF;color:#6B21A8}
 .oc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .oc-name{font-size:16px;font-weight:600;color:#333}
 .oc-name.crossed{text-decoration:line-through}
@@ -221,11 +224,16 @@ function renderArrange(){
   el.innerHTML = list.map(function(o){ return arrangeCard(o); }).join('');
 }
 
+var BIG_ORDER_THRESHOLD = 100; // 大單門檻（盒）
+
 function arrangeCard(o){
   var tags = typeTags(o);
+  var isBig = o.qty >= BIG_ORDER_THRESHOLD;
+  if(isBig) tags += ' <span class="tag tag-big">⚡大單</span>';
   var note = o.note ? '<div class="oc-note">📝 '+o.note+'</div>' : '';
   var phone = o.phone ? o.phone+' · ' : '';
-  return '<div class="ocard no-date" id="ac-'+o.rowIndex+'">'+
+  var cls = 'ocard no-date'+(isBig?' big-order':'');
+  return '<div class="'+cls+'" id="ac-'+o.rowIndex+'">'+
     '<div class="oc-top"><div class="oc-name">'+o.name+'</div><div class="oc-boxes">'+o.qty+' 盒</div></div>'+
     '<div class="oc-tags">'+tags+'</div>'+
     '<div class="oc-info">'+phone+o.amount+'元</div>'+

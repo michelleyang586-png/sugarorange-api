@@ -317,7 +317,7 @@ export default async function handler(req, res) {
         shippedAt:  r[16] || '',         // Q欄：出貨日期
         paidAt:     r[17] || '',         // R欄：收款日期
       }));
-      return res.json({ status: 'success', orders, stockLimit });
+      return res.json({ status: 'success', orders, stockLimit, totalStock, soldStock, remainStock });
     }
 
     // ── 後台：設定今日採收上限（寫入 D2）

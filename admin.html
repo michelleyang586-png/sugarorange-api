@@ -59,6 +59,10 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 .search-box{width:100%;border:1px solid #DDD;border-radius:10px;padding:10px 14px;font-size:15px;margin-bottom:12px;font-family:inherit;background:white}
 .filter-btn{border:1px solid #DDD;background:#F5F5F5;border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer;color:#666;font-family:inherit;transition:all .15s}
 .filter-btn.active{background:#F97316;border-color:#F97316;color:white;font-weight:500}
+.unpaid-summary{display:flex;justify-content:space-between;align-items:center;background:#FCEBEB;border:1px solid #F5B5B5;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#791F1F}
+.unpaid-summary.none{background:#E1F5EE;border-color:#A7E0CC;color:#085041}
+.unpaid-summary b{font-size:16px}
+.unpaid-summary .us-stats{display:flex;gap:14px;flex-wrap:wrap}
 .batch-bar{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
 .batch-btn{border:1px solid #DDD;background:white;border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;color:#555;font-family:inherit;font-weight:500}
 .batch-btn.batch-ship{border-color:#1D9E75;background:#E1F5EE;color:#085041}
@@ -191,6 +195,7 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
     <button class="filter-btn" onclick="setFilter('ship','待出貨',this)" data-group="ship">待出貨</button>
     <button class="filter-btn" onclick="setFilter('ship','已出貨',this)" data-group="ship">已出貨</button>
   </div>
+  <div id="unpaid-summary"></div>
   <div id="search-results"></div>
 </div>
 
@@ -243,6 +248,7 @@ function sw(id, btn){
   btn.classList.add('active');
   document.getElementById(id).classList.add('active');
   currentTab = id;
+  if(id==='search') doSearch();
 }
 
 function chDay(n){ viewDay=addD(viewDay,n); renderToday(); }
@@ -551,6 +557,7 @@ function setFilter(group, val, btn){
 function doSearch(){
   var q = document.getElementById('search-input').value.trim();
   var el = document.getElementById('search-results');
+  var sumEl = document.getElementById('unpaid-summary');
   var res = orders.filter(function(o){
     var matchQ = !q || o.name.includes(q) || o.phone.includes(q) || o.orderId.includes(q);
     var matchPay = filterPay==='all' ||
@@ -561,6 +568,25 @@ function doSearch(){
       (filterShip==='已出貨' && o.shippedAt);
     return matchQ && matchPay && matchShip;
   });
+
+  // ── 未收款總覽（依目前篩選結果計算）
+  var unpaid = res.filter(function(o){return !o.paidAt;});
+  if(!res.length){
+    sumEl.innerHTML='';
+  } else if(unpaid.length){
+    var uBoxes = unpaid.reduce(function(s,o){return s+o.qty;},0);
+    var uAmount = unpaid.reduce(function(s,o){return s+(o.totalAmount||o.amount||0);},0);
+    sumEl.className = 'unpaid-summary';
+    sumEl.innerHTML = '<div class="us-stats">'+
+      '<span>🔴 未收款 <b>'+unpaid.length+'</b> 筆</span>'+
+      '<span><b>'+uBoxes+'</b> 盒</span>'+
+      '<span>NT$ <b>'+uAmount.toLocaleString()+'</b></span>'+
+      '</div>';
+  } else {
+    sumEl.className = 'unpaid-summary none';
+    sumEl.innerHTML = '✅ 目前篩選結果全部已收款';
+  }
+
   if(!res.length){
     el.innerHTML='<div class="empty-msg">'+(q?'找不到「'+q+'」':'沒有符合條件的訂單')+'</div>';
     return;

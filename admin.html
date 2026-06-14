@@ -65,6 +65,18 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 .batch-btn.batch-paid{border-color:#BA7517;background:#FAEEDA;color:#633806}
 .batch-btn:disabled{opacity:.4;cursor:not-allowed}
 .batch-count{font-size:12px;color:#999;margin-left:auto}
+.big-overview{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.big-item{background:white;border-radius:12px;padding:12px 8px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.big-item.highlight{background:linear-gradient(135deg,#FFF7ED,#FFEDD5);border:1px solid #FDBA74}
+.big-label{font-size:12px;color:#999;margin-bottom:4px}
+.big-value{font-size:30px;font-weight:700;color:#333;line-height:1.1}
+.big-item.highlight .big-value{color:#EA580C}
+.big-value.over{color:#E24B4A}
+.big-unit{font-size:14px;font-weight:500}
+.limit-row{display:flex;align-items:center;gap:6px;font-size:12px;color:#999;margin-bottom:14px;flex-wrap:wrap}
+.limit-row input{width:70px;border:1px solid #DDD;border-radius:6px;padding:4px 8px;font-size:13px;font-family:inherit}
+.limit-edit-btn,.limit-save-btn{border:1px solid #DDD;background:#F5F5F5;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:#666;font-family:inherit}
+.limit-save-btn{border-color:#F97316;background:#FFF7ED;color:#EA580C}
 .oc-chk{display:flex;align-items:flex-start;gap:8px}
 .oc-chk input[type=checkbox]{width:20px;height:20px;margin-top:2px;flex-shrink:0;accent-color:#F97316}
 .oc-body{flex:1;min-width:0}
@@ -120,6 +132,24 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 
 <!-- 今日出貨 -->
 <div id="today" class="section">
+  <div class="big-overview">
+    <div class="big-item">
+      <div class="big-label">今天要出</div>
+      <div class="big-value" id="big-today">0<span class="big-unit">盒</span></div>
+    </div>
+    <div class="big-item">
+      <div class="big-label">明天預計</div>
+      <div class="big-value" id="big-tomorrow">0<span class="big-unit">盒</span></div>
+    </div>
+    <div class="big-item highlight">
+      <div class="big-label">還可再接</div>
+      <div class="big-value" id="big-remain">0<span class="big-unit">盒</span></div>
+    </div>
+  </div>
+  <div class="limit-row" id="limit-row">
+    <span>今日採收上限：<b id="limit-display">—</b> 盒</span>
+    <button class="limit-edit-btn" id="limit-edit-btn" onclick="editStockLimit()">✏️ 編輯</button>
+  </div>
   <div class="day-nav">
     <button onclick="chDay(-1)">‹</button>
     <span class="day-label" id="today-label"></span>
@@ -167,6 +197,7 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 <script>
 var API = 'https://sugarorange-api.vercel.app/api/order';
 var orders = [];
+var stockLimit = 0;
 var base = new Date(); base.setHours(0,0,0,0);
 var viewDay = new Date(base);
 var currentTab = 'arrange';
@@ -189,7 +220,10 @@ async function loadOrders(){
   try {
     var res = await fetch(API+'?action=getOrders');
     var data = await res.json();
-    if(data.status==='success') orders = data.orders;
+    if(data.status==='success'){
+      orders = data.orders;
+      stockLimit = data.stockLimit || 0;
+    }
     renderAll();
   } catch(e) {
     document.getElementById('arrange-list').innerHTML='<div class="loading">載入失敗，請重新整理</div>';
@@ -286,6 +320,56 @@ function renderToday(){
   selectedRows.forEach(function(r){ if(todayRowIndexes.indexOf(r)!==-1) keep.add(r); });
   selectedRows = keep;
   updateBatchBar();
+
+  renderBigOverview();
+}
+
+// ── 頂部大字總覽：今天/明天/還可再接
+function renderBigOverview(){
+  var todayStr = fmt(base);
+  var tomorrowStr = fmt(addD(base,1));
+  var todayTotal = orders.filter(function(o){return o.shipDate===todayStr;}).reduce(function(s,o){return s+o.qty;},0);
+  var tomorrowTotal = orders.filter(function(o){return o.shipDate===tomorrowStr;}).reduce(function(s,o){return s+o.qty;},0);
+  var remain = stockLimit - todayTotal;
+
+  document.getElementById('big-today').innerHTML = todayTotal+'<span class="big-unit">盒</span>';
+  document.getElementById('big-tomorrow').innerHTML = tomorrowTotal+'<span class="big-unit">盒</span>';
+  var remainEl = document.getElementById('big-remain');
+  remainEl.innerHTML = remain+'<span class="big-unit">盒</span>';
+  remainEl.classList.toggle('over', remain < 0);
+
+  var limitDisplay = document.getElementById('limit-display');
+  if(limitDisplay) limitDisplay.textContent = stockLimit>0 ? stockLimit : '尚未設定';
+}
+
+// ── 編輯今日採收上限
+function editStockLimit(){
+  var row = document.getElementById('limit-row');
+  row.innerHTML =
+    '<span>今日採收上限：</span>'+
+    '<input type="number" id="limit-input" value="'+(stockLimit||'')+'" placeholder="輸入盒數">'+
+    '<button class="limit-save-btn" onclick="saveStockLimit()">儲存</button>'+
+    '<button class="limit-edit-btn" onclick="renderBigOverviewAndCancel()">取消</button>';
+  document.getElementById('limit-input').focus();
+}
+
+function renderBigOverviewAndCancel(){
+  var row = document.getElementById('limit-row');
+  row.innerHTML =
+    '<span>今日採收上限：<b id="limit-display">'+(stockLimit>0?stockLimit:'尚未設定')+'</b> 盒</span>'+
+    '<button class="limit-edit-btn" id="limit-edit-btn" onclick="editStockLimit()">✏️ 編輯</button>';
+}
+
+async function saveStockLimit(){
+  var val = document.getElementById('limit-input').value;
+  var n = parseInt(val,10);
+  if(isNaN(n) || n<0){ alert('請輸入正確的盒數'); return; }
+  var btn = document.querySelector('.limit-save-btn');
+  btn.textContent = '儲存中...';
+  await fetch(API+'?action=setStockLimit&limit='+n);
+  stockLimit = n;
+  renderBigOverviewAndCancel();
+  renderBigOverview();
 }
 
 function toggleSelectRow(rowIndex, checked){

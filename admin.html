@@ -56,6 +56,15 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 .search-box{width:100%;border:1px solid #DDD;border-radius:10px;padding:10px 14px;font-size:15px;margin-bottom:12px;font-family:inherit;background:white}
 .filter-btn{border:1px solid #DDD;background:#F5F5F5;border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer;color:#666;font-family:inherit;transition:all .15s}
 .filter-btn.active{background:#F97316;border-color:#F97316;color:white;font-weight:500}
+.batch-bar{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.batch-btn{border:1px solid #DDD;background:white;border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;color:#555;font-family:inherit;font-weight:500}
+.batch-btn.batch-ship{border-color:#1D9E75;background:#E1F5EE;color:#085041}
+.batch-btn.batch-paid{border-color:#BA7517;background:#FAEEDA;color:#633806}
+.batch-btn:disabled{opacity:.4;cursor:not-allowed}
+.batch-count{font-size:12px;color:#999;margin-left:auto}
+.oc-chk{display:flex;align-items:flex-start;gap:8px}
+.oc-chk input[type=checkbox]{width:20px;height:20px;margin-top:2px;flex-shrink:0;accent-color:#F97316}
+.oc-body{flex:1;min-width:0}
 .loading{text-align:center;color:#BBB;font-size:14px;padding:30px 0}
 .print-area{display:none}
 @media print{
@@ -118,6 +127,12 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
     <div class="scard"><div class="sl">自取</div><div class="sv" id="s-pickup">0</div></div>
     <div class="scard"><div class="sl">宅配</div><div class="sv" id="s-delivery">0</div></div>
     <div class="scard hi"><div class="sl">合計採收</div><div class="sv" id="s-total">0 盒</div></div>
+  </div>
+  <div class="batch-bar">
+    <button class="batch-btn" id="select-all-btn" onclick="toggleSelectAll()">☐ 全選</button>
+    <button class="batch-btn batch-ship" id="batch-ship-btn" onclick="batchMarkShipped()" disabled>📦 已選標記出貨</button>
+    <button class="batch-btn batch-paid" id="batch-paid-btn" onclick="batchMarkPaid()" disabled>💰 已選標記收款</button>
+    <span class="batch-count" id="batch-count"></span>
   </div>
   <div class="sec-hd">自取訂單</div>
   <div id="list-pickup"></div>
@@ -240,6 +255,9 @@ async function setDateVal(rowIndex, val){
 }
 
 // ── 今日出貨
+var selectedRows = new Set();
+var todayRowIndexes = [];
+
 function renderToday(){
   var vds = fmt(viewDay);
   document.getElementById('today-label').textContent = fmtDisplay(viewDay);
@@ -253,6 +271,48 @@ function renderToday(){
   document.getElementById('s-total').textContent = (puB+deB)+' 盒';
   document.getElementById('list-pickup').innerHTML = pu.length ? pu.map(todayCard).join('') : '<div class="empty-msg">今天沒有自取</div>';
   document.getElementById('list-delivery').innerHTML = de.length ? de.map(todayCard).join('') : '<div class="empty-msg">今天沒有宅配</div>';
+
+  // 換頁時，只保留今天還存在的勾選
+  todayRowIndexes = day.map(function(o){return o.rowIndex;});
+  var keep = new Set();
+  selectedRows.forEach(function(r){ if(todayRowIndexes.indexOf(r)!==-1) keep.add(r); });
+  selectedRows = keep;
+  updateBatchBar();
+}
+
+function toggleSelectRow(rowIndex, checked){
+  if(checked) selectedRows.add(rowIndex);
+  else selectedRows.delete(rowIndex);
+  updateBatchBar();
+}
+
+function toggleSelectAll(){
+  var allSelected = todayRowIndexes.length>0 && todayRowIndexes.every(function(r){return selectedRows.has(r);});
+  if(allSelected){
+    selectedRows.clear();
+  } else {
+    todayRowIndexes.forEach(function(r){selectedRows.add(r);});
+  }
+  // 同步畫面上的 checkbox
+  todayRowIndexes.forEach(function(r){
+    var el = document.getElementById('chk-'+r);
+    if(el) el.checked = selectedRows.has(r);
+  });
+  updateBatchBar();
+}
+
+function updateBatchBar(){
+  var selBtn = document.getElementById('select-all-btn');
+  var shipBtn = document.getElementById('batch-ship-btn');
+  var paidBtn = document.getElementById('batch-paid-btn');
+  var countEl = document.getElementById('batch-count');
+  if(!selBtn) return;
+  var allSelected = todayRowIndexes.length>0 && todayRowIndexes.every(function(r){return selectedRows.has(r);});
+  selBtn.textContent = allSelected ? '☑ 取消全選' : '☐ 全選';
+  var n = selectedRows.size;
+  shipBtn.disabled = n===0;
+  paidBtn.disabled = n===0;
+  countEl.textContent = n>0 ? '已選 '+n+' 筆' : '';
 }
 
 function todayCard(o){
@@ -260,7 +320,11 @@ function todayCard(o){
   var tags = typeTags(o);
   var note = o.note ? '<div class="oc-note">📝 '+o.note+'</div>' : '';
   var phone = o.phone ? o.phone : '';
+  var checked = selectedRows.has(o.rowIndex) ? ' checked' : '';
   return '<div class="ocard'+(done?' done':'')+'" id="tc-'+o.rowIndex+'">'+
+    '<div class="oc-chk">'+
+    '<input type="checkbox" id="chk-'+o.rowIndex+'" onchange="toggleSelectRow('+o.rowIndex+',this.checked)"'+checked+'>'+
+    '<div class="oc-body">'+
     '<div class="oc-top"><div class="oc-name'+(done?' crossed':'')+'">'+o.name+'</div><div class="oc-boxes">'+o.qty+' 盒</div></div>'+
     '<div class="oc-tags">'+tags+'</div>'+
     (phone?'<div class="oc-info">'+phone+'</div>':'')+
@@ -270,7 +334,7 @@ function todayCard(o){
     '<button class="btn-paid'+(o.paidAt?' on':'')+'" onclick="togglePaid('+o.rowIndex+')">'+(o.paidAt?'✓ 已收款':'收款')+'</button>'+
     '</div>'+
     (o.type==='宅配' ? '<button id="copy-btn-'+o.rowIndex+'" onclick="copyLabel('+o.rowIndex+')" style="width:100%;margin-top:6px;padding:7px;border-radius:8px;border:1px solid #DDD;background:#F5F5F5;color:#555;font-size:12px;cursor:pointer;font-family:inherit">📋 複製出貨標籤</button>' : '')+
-    '</div>';
+    '</div></div></div>';
 }
 
 async function toggleShip(rowIndex){
@@ -292,6 +356,62 @@ async function togglePaid(rowIndex){
   var data = await res.json();
   o.paidAt = data.paidAt || '';
   o.payStatus = o.paidAt ? '已收款' : (o.type==='宅配'?'待匯款':'貨到付款');
+  renderToday();
+}
+
+// ── 批次標記出貨（跳過已是該狀態，逐筆 await，避免 Sheets 寫入衝突）
+async function batchMarkShipped(){
+  var rows = Array.from(selectedRows);
+  var targets = rows.map(function(r){return orders.find(function(x){return x.rowIndex===r;});})
+    .filter(function(o){return o && !o.shippedAt;});
+  if(!targets.length){ alert('所選訂單都已是「已出貨」狀態'); return; }
+
+  var btn = document.getElementById('batch-ship-btn');
+  var shipBtn2 = document.getElementById('batch-paid-btn');
+  var selBtn = document.getElementById('select-all-btn');
+  var orig = btn.textContent;
+  btn.disabled = true; shipBtn2.disabled = true; selBtn.disabled = true;
+
+  for(var i=0;i<targets.length;i++){
+    var o = targets[i];
+    btn.textContent = '處理中 ('+(i+1)+'/'+targets.length+')...';
+    var res = await fetch(API+'?action=markShipped&rowIndex='+o.rowIndex+'&undo=0');
+    var data = await res.json();
+    o.shippedAt = data.shippedAt || '';
+    o.shipStatus = o.shippedAt ? '已出貨' : '待出貨';
+  }
+
+  btn.textContent = orig;
+  selBtn.disabled = false;
+  selectedRows.clear();
+  renderToday();
+}
+
+// ── 批次標記收款（跳過已是該狀態，逐筆 await，避免 Sheets 寫入衝突）
+async function batchMarkPaid(){
+  var rows = Array.from(selectedRows);
+  var targets = rows.map(function(r){return orders.find(function(x){return x.rowIndex===r;});})
+    .filter(function(o){return o && !o.paidAt;});
+  if(!targets.length){ alert('所選訂單都已是「已收款」狀態'); return; }
+
+  var btn = document.getElementById('batch-paid-btn');
+  var shipBtn2 = document.getElementById('batch-ship-btn');
+  var selBtn = document.getElementById('select-all-btn');
+  var orig = btn.textContent;
+  btn.disabled = true; shipBtn2.disabled = true; selBtn.disabled = true;
+
+  for(var i=0;i<targets.length;i++){
+    var o = targets[i];
+    btn.textContent = '處理中 ('+(i+1)+'/'+targets.length+')...';
+    var res = await fetch(API+'?action=markPaid&rowIndex='+o.rowIndex+'&undo=0&deliveryType='+encodeURIComponent(o.type));
+    var data = await res.json();
+    o.paidAt = data.paidAt || '';
+    o.payStatus = o.paidAt ? '已收款' : (o.type==='宅配'?'待匯款':'貨到付款');
+  }
+
+  btn.textContent = orig;
+  selBtn.disabled = false;
+  selectedRows.clear();
   renderToday();
 }
 

@@ -198,15 +198,15 @@ export default async function handler(req, res) {
       // O 預計出貨日(後台排) | P 🟠出貨日期(後台自動) | Q 🟢收款日期(後台自動)
       let firstRowIndex = null;
       for (const row of orderItems) {
-        const result = await appendRow(token, '訂單總表!A:R', [[
+        const result = await appendRow(token, '訂單總表!A:S', [[
           orderId, timestamp, lineName, actualName, phone,
           row.item.name, deliveryType, row.qty, row.itemAmount,
           address || '自取', note || '',
           deliveryType === '宅配' ? '待匯款' : '貨到付款',
-          '待出貨', '', 'NT$'+amt, '', '', ''
+          '待出貨', '', 'NT$'+amt, '', '', '', '零售'
           // A訂單編號 B時間 C LINE D收件人 E電話 F規格 G取貨方式
           // H數量 I商品金額 J地址 K備註 L付款狀態 M出貨狀態 N後五碼
-          // O總金額(含運費) P預計出貨日 Q🟠出貨日期 R🟢收款日期
+          // O總金額(含運費) P預計出貨日 Q🟠出貨日期 R🟢收款日期 S客戶類型
         ]]);
         if (firstRowIndex === null) {
           const match = result.updates.updatedRange.match(/A(\d+):/);
@@ -294,7 +294,7 @@ export default async function handler(req, res) {
 
     // ── 後台：讀取所有訂單
     if (action === 'getOrders') {
-      const rows = await readRange(token, '訂單總表!A:Q');
+      const rows = await readRange(token, '訂單總表!A:S');
       if (rows.length < 2) return res.json({ status: 'success', orders: [] });
       const orders = rows.slice(1).map((r, i) => ({
         rowIndex: i + 2,
@@ -316,6 +316,7 @@ export default async function handler(req, res) {
         shipDate:   r[15] || '',         // P欄：預計出貨日
         shippedAt:  r[16] || '',         // Q欄：出貨日期
         paidAt:     r[17] || '',         // R欄：收款日期
+        custType:   r[18] || '零售',      // S欄：客戶類型（零售／批發）
       }));
       return res.json({ status: 'success', orders, stockLimit, totalStock, soldStock, remainStock });
     }

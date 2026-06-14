@@ -358,7 +358,7 @@
     document.getElementById('price-display').innerHTML = html;
   }
 
-  function showSuccessScreen(orderId, name, specSummary, totalAmount, shipping, address) {
+  function showSuccessScreen(orderId, name, specSummary, totalAmount, shipping, address, note) {
     document.getElementById('main-screen').style.display = 'none';
     var screen = document.getElementById('success-screen');
     screen.style.display = 'block';
@@ -368,6 +368,9 @@
     var shippingHtml = shipping > 0
       ? '<div class="order-row"><span class="label">新竹貨運運費</span><span class="value">NT$ ' + shipping + '</span></div>'
       : '';
+    var noteHtml = note
+      ? '<div class="order-row"><span class="label">備註</span><span class="value">' + note + '</span></div>'
+      : '';
     document.getElementById('success-summary').innerHTML =
       '<h3>🧾 訂單明細</h3>' +
       '<div class="order-row"><span class="label">訂單編號</span><span class="value">' + orderId + '</span></div>' +
@@ -376,6 +379,7 @@
       locationHtml +
       '<div class="order-row"><span class="label">訂購內容</span><span class="value">' + specSummary.replace(/、/g, '<br>') + '</span></div>' +
       shippingHtml +
+      noteHtml +
       '<div class="order-total-row"><span>應付總金額</span><span class="value">NT$ ' + totalAmount + '</span></div>';
   }
 
@@ -441,7 +445,7 @@
       var res    = await fetch(API_URL + '?' + params.toString());
       var result = await res.json();
       if (result.status === 'success') {
-        showSuccessScreen(result.orderId, name, specSummary, totalAmount, shipping, address);
+        showSuccessScreen(result.orderId, name, specSummary, totalAmount, shipping, address, note);
       } else {
         throw new Error('API returned non-success status');
       }

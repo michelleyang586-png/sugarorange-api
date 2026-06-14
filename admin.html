@@ -43,6 +43,7 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 .t-cash{background:#EAF3DE;color:#27500A}
 .t-unpaid{background:#FCEBEB;color:#791F1F}
 .t-paid{background:#E1F5EE;color:#085041}
+.t-wholesale{background:#FAEEDA;color:#633806}
 .oc-info{font-size:12px;color:#999;margin-bottom:8px;line-height:1.6}
 .oc-note{font-size:12px;color:#F97316;margin-bottom:8px}
 .date-row{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap}
@@ -728,6 +729,7 @@ function typeTags(o){
   if(o.payStatus==='已收款') t+=' <span class="tag t-paid">已收款</span>';
   else if(o.payStatus==='待匯款') t+=' <span class="tag t-unpaid">待匯款</span>';
   else if(o.type==='自取') t+=' <span class="tag t-cash">現場收款</span>';
+  if(o.custType==='批發') t+=' <span class="tag t-wholesale">📦 批發</span>';
   return t;
 }
 

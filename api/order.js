@@ -202,7 +202,7 @@ export default async function handler(req, res) {
           orderId, timestamp, lineName, actualName, "'"+phone,
           row.item.name, deliveryType, row.qty, row.itemAmount,
           address || '自取', note || '',
-          deliveryType === '宅配' ? '待匯款' : '貨到付款',
+          deliveryType === '宅配' ? '待匯款' : '取貨付款',
           '待出貨', '', 'NT$'+amt, '', '', '', '零售'
           // A訂單編號 B時間 C LINE D收件人 E電話 F規格 G取貨方式
           // H數量 I商品金額 J地址 K備註 L付款狀態 M出貨狀態 N後五碼
@@ -239,7 +239,7 @@ export default async function handler(req, res) {
         '總金額：NT$ ' + amt + '\n' +
         (deliveryType === '宅配' ? '地址：' + address + '\n' : '') +
         (note ? '備註：' + note + '\n' : '') +
-        '付款：' + (deliveryType === '宅配' ? '⏳ 等待匯款' : '貨到付款');
+        '付款：' + (deliveryType === '宅配' ? '⏳ 等待匯款' : '取貨付款');
 
       // ── 顧客通知（LINE）
       let customerMsg;
@@ -255,7 +255,8 @@ export default async function handler(req, res) {
           '━━━━━━━━━━━━━━━\n' +
           '🏪 取貨方式：現場自取\n' +
           '📍 自取地點：' + PICKUP_ADDRESS + '\n' +
-          '💰 應付金額：NT$ ' + amt + '（貨到付款）' +
+          '💰 應付金額：NT$ ' + amt + '（取貨付款）\n' +
+          '💡 如需提前轉帳，請私訊我們索取匯款資訊' +
           noteText + '\n' +
           '━━━━━━━━━━━━━━━\n' +
           '感謝訂購！如有問題請直接回覆訊息 🙏';
@@ -351,7 +352,7 @@ export default async function handler(req, res) {
       const { rowIndex, undo, deliveryType } = req.query;
       const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
       const paidAt = undo === '1' ? '' : now;
-      const payStatus = undo === '1' ? (deliveryType === '宅配' ? '待匯款' : '貨到付款') : '已收款';
+      const payStatus = undo === '1' ? (deliveryType === '宅配' ? '待匯款' : '取貨付款') : '已收款';
       await writeRange(token, `訂單總表!L${rowIndex}`, [[payStatus]]);
       await writeRange(token, `訂單總表!R${rowIndex}`, [[paidAt]]);
       return res.json({ status: 'success', paidAt });

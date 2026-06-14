@@ -150,6 +150,11 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 
 <!-- 待安排 -->
 <div id="arrange" class="section active">
+  <div style="display:flex;gap:6px;margin-bottom:10px">
+    <button class="filter-btn active" data-group="arrange-type" onclick="setArrangeTypeFilter('all',this)">全部</button>
+    <button class="filter-btn" data-group="arrange-type" onclick="setArrangeTypeFilter('自取',this)">🏪 自取</button>
+    <button class="filter-btn" data-group="arrange-type" onclick="setArrangeTypeFilter('宅配',this)">🚛 宅配</button>
+  </div>
   <div id="arrange-list"><div class="loading">載入中...</div></div>
 </div>
 
@@ -342,13 +347,32 @@ function sw(id, btn){
 function chDay(n){ viewDay=addD(viewDay,n); renderToday(); }
 
 // ── 待安排
+var arrangeTypeFilter = 'all';
+
+function setArrangeTypeFilter(val, btn){
+  arrangeTypeFilter = val;
+  document.querySelectorAll('.filter-btn[data-group="arrange-type"]').forEach(function(b){
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  renderArrange();
+}
+
 function renderArrange(){
   var list = orders.filter(function(o){ return !o.shipDate && o.shipStatus!=='已出貨'; });
   var badge = document.getElementById('badge-arrange');
   if(list.length){ badge.textContent=list.length; badge.style.display=''; }
   else { badge.style.display='none'; }
+
+  if(arrangeTypeFilter!=='all'){
+    list = list.filter(function(o){ return o.type===arrangeTypeFilter; });
+  }
+
   var el = document.getElementById('arrange-list');
-  if(!list.length){ el.innerHTML='<div class="empty-msg">所有訂單都已安排出貨日 ✓</div>'; return; }
+  if(!list.length){
+    el.innerHTML='<div class="empty-msg">'+(arrangeTypeFilter==='all'?'所有訂單都已安排出貨日 ✓':'目前沒有符合條件的訂單')+'</div>';
+    return;
+  }
   el.innerHTML = list.map(function(o){ return arrangeCard(o); }).join('');
 }
 

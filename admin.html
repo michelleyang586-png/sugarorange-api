@@ -535,7 +535,7 @@ async function togglePaid(rowIndex){
   var res = await fetch(API+'?action=markPaid&rowIndex='+rowIndex+'&undo='+undo+'&deliveryType='+encodeURIComponent(o.type));
   var data = await res.json();
   o.paidAt = data.paidAt || '';
-  o.payStatus = o.paidAt ? '已收款' : (o.type==='宅配'?'待匯款':'貨到付款');
+  o.payStatus = o.paidAt ? '已收款' : (o.type==='宅配'?'待匯款':'取貨付款');
   renderToday();
 }
 
@@ -586,7 +586,7 @@ async function batchMarkPaid(){
     var res = await fetch(API+'?action=markPaid&rowIndex='+o.rowIndex+'&undo=0&deliveryType='+encodeURIComponent(o.type));
     var data = await res.json();
     o.paidAt = data.paidAt || '';
-    o.payStatus = o.paidAt ? '已收款' : (o.type==='宅配'?'待匯款':'貨到付款');
+    o.payStatus = o.paidAt ? '已收款' : (o.type==='宅配'?'待匯款':'取貨付款');
   }
 
   btn.textContent = orig;

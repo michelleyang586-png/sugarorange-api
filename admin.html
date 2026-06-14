@@ -52,6 +52,7 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 .qbtn{background:#F5F5F5;border:1px solid #DDD;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:#333;font-family:inherit}
 .qbtn:active{background:#EEE}
 .date-input{font-size:12px;border:1px solid #DDD;border-radius:6px;padding:4px 8px;color:#333;font-family:inherit;background:white}
+.date-confirm-btn{background:#FFF7ED;border:1px solid #F97316;color:#EA580C;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:500}
 .action-row{display:flex;gap:8px}
 .btn-ship{flex:1;padding:9px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid #1D9E75;background:#E1F5EE;color:#085041}
 .btn-ship.on{background:#F5F5F5;border-color:#DDD;color:#999}
@@ -178,6 +179,11 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
     <button onclick="chDay(1)">›</button>
     <button onclick="window.print()" style="background:white;border:1px solid #DDD;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;color:#666">列印</button>
   </div>
+  <div style="display:flex;gap:6px;margin-bottom:10px">
+    <button class="filter-btn active" data-group="today-type" onclick="setTodayTypeFilter('all',this)">全部</button>
+    <button class="filter-btn" data-group="today-type" onclick="setTodayTypeFilter('自取',this)">🏪 自取</button>
+    <button class="filter-btn" data-group="today-type" onclick="setTodayTypeFilter('宅配',this)">🚛 宅配</button>
+  </div>
   <div class="summary-row">
     <div class="scard"><div class="sl">自取</div><div class="sv" id="s-pickup">0</div></div>
     <div class="scard"><div class="sl">宅配</div><div class="sv" id="s-delivery">0</div></div>
@@ -189,9 +195,9 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
     <button class="batch-btn batch-paid" id="batch-paid-btn" onclick="batchMarkPaid()" disabled>💰 已選標記收款</button>
     <span class="batch-count" id="batch-count"></span>
   </div>
-  <div class="sec-hd">自取訂單</div>
+  <div class="sec-hd" id="sec-pickup-hd">自取訂單</div>
   <div id="list-pickup"></div>
-  <div class="sec-hd">宅配訂單</div>
+  <div class="sec-hd" id="sec-delivery-hd">宅配訂單</div>
   <div id="list-delivery"></div>
 </div>
 
@@ -365,7 +371,8 @@ function arrangeCard(o){
     '<button class="qbtn" onclick="setDate('+o.rowIndex+',0)">今天</button>'+
     '<button class="qbtn" onclick="setDate('+o.rowIndex+',1)">明天</button>'+
     '<button class="qbtn" onclick="setDate('+o.rowIndex+',2)">後天</button>'+
-    '<input class="date-input" type="date" onchange="setDateVal('+o.rowIndex+',this.value)">'+
+    '<input class="date-input" type="date" id="date-input-'+o.rowIndex+'" onchange="onDatePicked('+o.rowIndex+',this.value)">'+
+    '<button class="date-confirm-btn" id="date-confirm-'+o.rowIndex+'" style="display:none" onclick="confirmDate('+o.rowIndex+')"></button>'+
     '</div></div></div>';
 }
 
@@ -376,17 +383,49 @@ async function setDate(rowIndex, n){
   if(o) o.shipDate = d;
   renderAll();
 }
+var pendingDates = {};
+
+// 手機原生日期選擇器點開時可能會先帶入「今天」並觸發 onchange，
+// 所以這裡先暫存選擇的日期，顯示確認按鈕，等使用者按下確認才真正送出
+function onDatePicked(rowIndex, val){
+  if(!val) return;
+  pendingDates[rowIndex] = val;
+  var btn = document.getElementById('date-confirm-'+rowIndex);
+  if(!btn) return;
+  var d = parseD(val);
+  var label = (d.getMonth()+1)+'/'+d.getDate();
+  btn.textContent = '✓ 設為 '+label;
+  btn.style.display = '';
+}
+
+async function confirmDate(rowIndex){
+  var val = pendingDates[rowIndex];
+  if(!val) return;
+  await setDateVal(rowIndex, val);
+}
+
 async function setDateVal(rowIndex, val){
   if(!val) return;
   await fetch(API+'?action=setShipDate&rowIndex='+rowIndex+'&shipDate='+val);
   var o = orders.find(function(x){return x.rowIndex===rowIndex;});
   if(o) o.shipDate = val;
+  delete pendingDates[rowIndex];
   renderAll();
 }
 
 // ── 今日出貨
 var selectedRows = new Set();
 var todayRowIndexes = [];
+var todayTypeFilter = 'all';
+
+function setTodayTypeFilter(val, btn){
+  todayTypeFilter = val;
+  document.querySelectorAll('.filter-btn[data-group="today-type"]').forEach(function(b){
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  renderToday();
+}
 
 function renderToday(){
   var vds = fmt(viewDay);
@@ -399,11 +438,25 @@ function renderToday(){
   document.getElementById('s-pickup').textContent = puB+' 盒';
   document.getElementById('s-delivery').textContent = deB+' 盒';
   document.getElementById('s-total').textContent = (puB+deB)+' 盒';
+
+  // 依篩選決定顯示哪些區塊
+  var showPu = todayTypeFilter==='all' || todayTypeFilter==='自取';
+  var showDe = todayTypeFilter==='all' || todayTypeFilter==='宅配';
+  document.getElementById('sec-pickup-hd').style.display = showPu ? '' : 'none';
+  document.getElementById('list-pickup').style.display = showPu ? '' : 'none';
+  document.getElementById('sec-delivery-hd').style.display = showDe ? '' : 'none';
+  document.getElementById('list-delivery').style.display = showDe ? '' : 'none';
+
   document.getElementById('list-pickup').innerHTML = pu.length ? pu.map(todayCard).join('') : '<div class="empty-msg">今天沒有自取</div>';
   document.getElementById('list-delivery').innerHTML = de.length ? de.map(todayCard).join('') : '<div class="empty-msg">今天沒有宅配</div>';
 
-  // 換頁時，只保留今天還存在的勾選
-  todayRowIndexes = day.map(function(o){return o.rowIndex;});
+  // 全選/批次操作只作用於目前篩選後可見的訂單
+  var visible = [];
+  if(showPu) visible = visible.concat(pu);
+  if(showDe) visible = visible.concat(de);
+  todayRowIndexes = visible.map(function(o){return o.rowIndex;});
+
+  // 換頁/換篩選時，只保留還存在的勾選
   var keep = new Set();
   selectedRows.forEach(function(r){ if(todayRowIndexes.indexOf(r)!==-1) keep.add(r); });
   selectedRows = keep;

@@ -81,6 +81,22 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
 .limit-row input{width:70px;border:1px solid #DDD;border-radius:6px;padding:4px 8px;font-size:13px;font-family:inherit}
 .limit-edit-btn,.limit-save-btn{border:1px solid #DDD;background:#F5F5F5;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:#666;font-family:inherit}
 .limit-save-btn{border-color:#F97316;background:#FFF7ED;color:#EA580C}
+
+/* 統計分頁 */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.stat-card{background:white;border-radius:12px;padding:14px 12px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.stat-card .si{font-size:20px;margin-bottom:4px}
+.stat-card .sv2{font-size:24px;font-weight:700;color:#333;line-height:1.2}
+.stat-card .sl2{font-size:12px;color:#999;margin-top:2px}
+.stat-card.paid .sv2{color:#1D9E75}
+.stat-card.unpaid .sv2{color:#E24B4A}
+.stat-block{background:white;border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.stat-line{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#555;margin-bottom:4px}
+.stat-line b{font-size:14px;color:#333}
+.progress-bar{height:8px;background:#F0F0F0;border-radius:4px;overflow:hidden;margin:6px 0 10px}
+.progress-fill{height:100%;background:#1D9E75;border-radius:4px;transition:width .3s}
+.progress-fill.delivery{background:#0C447C}
+.stat-sub{font-size:11px;color:#AAA;margin-top:2px}
 .oc-chk{display:flex;align-items:flex-start;gap:8px}
 .oc-chk input[type=checkbox]{width:20px;height:20px;margin-top:2px;flex-shrink:0;accent-color:#F97316}
 .oc-body{flex:1;min-width:0}
@@ -120,6 +136,7 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
   <button class="tab" onclick="sw('today',this)">今日出貨</button>
   <button class="tab" onclick="sw('upcoming',this)">出貨預覽</button>
   <button class="tab" onclick="sw('search',this)">查訂單</button>
+  <button class="tab" onclick="sw('stats',this)">統計</button>
 </div>
 
 <div class="print-btn-bar">
@@ -199,10 +216,69 @@ body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F
   <div id="search-results"></div>
 </div>
 
+<!-- 統計 -->
+<div id="stats" class="section">
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="si">📋</div>
+      <div class="sv2" id="st-order-count">0</div>
+      <div class="sl2">總訂單數</div>
+    </div>
+    <div class="stat-card">
+      <div class="si">🍊</div>
+      <div class="sv2" id="st-total-boxes">0</div>
+      <div class="sl2">總接單盒數</div>
+    </div>
+  </div>
+
+  <div class="sec-hd">出貨進度</div>
+  <div class="stat-block">
+    <div class="stat-line"><span>已出貨</span><b id="st-shipped-boxes">0 盒</b></div>
+    <div class="progress-bar"><div class="progress-fill" id="st-ship-fill" style="width:0%"></div></div>
+    <div class="stat-line"><span>待出貨</span><b id="st-unshipped-boxes">0 盒</b></div>
+    <div class="stat-sub" id="st-ship-sub"></div>
+  </div>
+
+  <div class="sec-hd">收款狀況</div>
+  <div class="stat-grid">
+    <div class="stat-card paid">
+      <div class="si">🟢</div>
+      <div class="sv2" id="st-paid-amount">NT$0</div>
+      <div class="sl2">已收金額</div>
+    </div>
+    <div class="stat-card unpaid">
+      <div class="si">🔴</div>
+      <div class="sv2" id="st-unpaid-amount">NT$0</div>
+      <div class="sl2">待收金額</div>
+    </div>
+  </div>
+  <div class="stat-block">
+    <div class="progress-bar"><div class="progress-fill" id="st-paid-fill" style="width:0%"></div></div>
+    <div class="stat-sub" id="st-paid-sub"></div>
+  </div>
+
+  <div class="sec-hd">取貨方式</div>
+  <div class="stat-block">
+    <div class="stat-line"><span>🏪 自取</span><b id="st-pickup">0 筆 / 0 盒</b></div>
+    <div class="progress-bar"><div class="progress-fill" id="st-pickup-fill" style="width:0%"></div></div>
+    <div class="stat-line"><span>🚛 宅配</span><b id="st-delivery">0 筆 / 0 盒</b></div>
+    <div class="progress-bar"><div class="progress-fill delivery" id="st-delivery-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="sec-hd">季節庫存</div>
+  <div class="stat-block">
+    <div class="stat-line"><span>總庫存</span><b id="st-stock-total">0 盒</b></div>
+    <div class="stat-line"><span>已售出</span><b id="st-stock-sold">0 盒</b></div>
+    <div class="stat-line"><span>剩餘可訂</span><b id="st-stock-remain">0 盒</b></div>
+    <div class="progress-bar"><div class="progress-fill" id="st-stock-fill" style="width:0%"></div></div>
+  </div>
+</div>
+
 <script>
 var API = 'https://sugarorange-api.vercel.app/api/order';
 var orders = [];
 var stockLimit = 0;
+var totalStock = 0, soldStock = 0, remainStock = 0;
 var base = new Date(); base.setHours(0,0,0,0);
 var viewDay = new Date(base);
 var currentTab = 'arrange';
@@ -228,6 +304,9 @@ async function loadOrders(){
     if(data.status==='success'){
       orders = data.orders;
       stockLimit = data.stockLimit || 0;
+      totalStock = data.totalStock || 0;
+      soldStock = data.soldStock || 0;
+      remainStock = data.remainStock || 0;
     }
     renderAll();
   } catch(e) {
@@ -240,6 +319,7 @@ function renderAll(){
   renderToday();
   renderUpcoming();
   if(currentTab==='search') doSearch();
+  if(currentTab==='stats') renderStats();
 }
 
 function sw(id, btn){
@@ -249,6 +329,7 @@ function sw(id, btn){
   document.getElementById(id).classList.add('active');
   currentTab = id;
   if(id==='search') doSearch();
+  if(id==='stats') renderStats();
 }
 
 function chDay(n){ viewDay=addD(viewDay,n); renderToday(); }
@@ -648,6 +729,57 @@ function typeTags(o){
   else if(o.payStatus==='待匯款') t+=' <span class="tag t-unpaid">待匯款</span>';
   else if(o.type==='自取') t+=' <span class="tag t-cash">現場收款</span>';
   return t;
+}
+
+// ── 統計分頁
+function renderStats(){
+  var orderCount = orders.length;
+  var totalBoxes = orders.reduce(function(s,o){return s+o.qty;},0);
+
+  var shipped = orders.filter(function(o){return o.shippedAt;});
+  var unshipped = orders.filter(function(o){return !o.shippedAt;});
+  var shippedBoxes = shipped.reduce(function(s,o){return s+o.qty;},0);
+  var unshippedBoxes = unshipped.reduce(function(s,o){return s+o.qty;},0);
+  var shipPct = totalBoxes>0 ? Math.round(shippedBoxes/totalBoxes*100) : 0;
+
+  var paid = orders.filter(function(o){return o.paidAt;});
+  var unpaid = orders.filter(function(o){return !o.paidAt;});
+  var paidAmount = paid.reduce(function(s,o){return s+(o.totalAmount||o.amount||0);},0);
+  var unpaidAmount = unpaid.reduce(function(s,o){return s+(o.totalAmount||o.amount||0);},0);
+  var totalAmount = paidAmount+unpaidAmount;
+  var paidPct = totalAmount>0 ? Math.round(paidAmount/totalAmount*100) : 0;
+
+  var pu = orders.filter(function(o){return o.type==='自取';});
+  var de = orders.filter(function(o){return o.type==='宅配';});
+  var puBoxes = pu.reduce(function(s,o){return s+o.qty;},0);
+  var deBoxes = de.reduce(function(s,o){return s+o.qty;},0);
+  var typeTotal = puBoxes+deBoxes;
+  var puPct = typeTotal>0 ? Math.round(puBoxes/typeTotal*100) : 0;
+  var dePct = typeTotal>0 ? 100-puPct : 0;
+
+  document.getElementById('st-order-count').textContent = orderCount;
+  document.getElementById('st-total-boxes').textContent = totalBoxes;
+
+  document.getElementById('st-shipped-boxes').textContent = shippedBoxes+' 盒（'+shipped.length+'筆）';
+  document.getElementById('st-unshipped-boxes').textContent = unshippedBoxes+' 盒（'+unshipped.length+'筆）';
+  document.getElementById('st-ship-fill').style.width = shipPct+'%';
+  document.getElementById('st-ship-sub').textContent = '已出貨佔 '+shipPct+'%';
+
+  document.getElementById('st-paid-amount').textContent = 'NT$'+paidAmount.toLocaleString();
+  document.getElementById('st-unpaid-amount').textContent = 'NT$'+unpaidAmount.toLocaleString();
+  document.getElementById('st-paid-fill').style.width = paidPct+'%';
+  document.getElementById('st-paid-sub').textContent = '已收款佔總額 '+paidPct+'%（'+paid.length+'/'+orderCount+' 筆）';
+
+  document.getElementById('st-pickup').textContent = pu.length+' 筆 / '+puBoxes+' 盒';
+  document.getElementById('st-delivery').textContent = de.length+' 筆 / '+deBoxes+' 盒';
+  document.getElementById('st-pickup-fill').style.width = puPct+'%';
+  document.getElementById('st-delivery-fill').style.width = dePct+'%';
+
+  document.getElementById('st-stock-total').textContent = totalStock+' 盒';
+  document.getElementById('st-stock-sold').textContent = soldStock+' 盒';
+  document.getElementById('st-stock-remain').textContent = remainStock+' 盒';
+  var stockPct = totalStock>0 ? Math.round(soldStock/totalStock*100) : 0;
+  document.getElementById('st-stock-fill').style.width = stockPct+'%';
 }
 
 function printAll(){

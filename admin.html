@@ -1,970 +1,743 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>砂糖橘後台管理</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>餘有榮焉｜訂單管理</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;background:#F5F5F5;color:#333;max-width:540px;margin:0 auto}
-.top-header{background:linear-gradient(135deg,#F97316,#FB923C);color:white;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.top-header h1{font-size:20px;font-weight:600}
-.reload-btn{background:rgba(255,255,255,0.2);border:none;color:white;padding:10px 16px;border-radius:8px;font-size:15px;cursor:pointer}
-.tab-bar{display:flex;background:white;border-bottom:1px solid #EEE;position:sticky;top:49px;z-index:99}
-.tab{flex:1;padding:16px 2px;border:none;background:transparent;font-size:15px;color:#999;cursor:pointer;border-bottom:3px solid transparent;font-family:inherit;position:relative}
-.tab.active{color:#F97316;border-bottom-color:#F97316;font-weight:500}
-.badge{position:absolute;top:8px;right:6px;background:#E24B4A;color:#fff;font-size:12px;border-radius:8px;padding:2px 7px;line-height:1.4}
-.section{display:none;padding:12px 14px}.section.active{display:block}
-.summary-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
-.scard{background:white;border-radius:10px;padding:14px 12px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
-.scard .sl{font-size:14px;color:#999;margin-bottom:4px}
-.scard .sv{font-size:26px;font-weight:700;color:#333}
-.scard.hi .sv{color:#1D9E75}
-.day-nav{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.day-nav button{background:white;border:1px solid #DDD;border-radius:8px;padding:12px 18px;cursor:pointer;font-size:19px;color:#333;font-weight:600}
-.day-label{flex:1;text-align:center;font-size:18px;font-weight:600;color:#333}
-.sec-hd{font-size:14px;font-weight:700;color:#888;letter-spacing:.5px;margin:14px 0 8px;padding-bottom:5px;border-bottom:1px solid #EEE}
-.empty-msg{text-align:center;color:#BBB;font-size:16px;padding:24px 0}
-.ocard{background:white;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
-.ocard.done{opacity:.45}
-.ocard.no-date{border-left:3px solid #E24B4A}
-.ocard.big-order{border-left:4px solid #9333EA}
-.ocard.no-date.big-order{border-left:4px solid #9333EA;border-image:linear-gradient(to bottom,#9333EA 0%,#9333EA 50%,#E24B4A 50%,#E24B4A 100%) 1}
-.tag-big{background:#F3E8FF;color:#6B21A8}
-.oc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.oc-name{font-size:22px;font-weight:700;color:#333}
-.oc-name.crossed{text-decoration:line-through}
-.oc-id{font-size:13px;color:#BBB;margin-bottom:6px;font-family:monospace}
-.oc-boxes{font-size:22px;font-weight:700;color:#333;white-space:nowrap}
-.oc-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.tag{font-size:14px;padding:5px 12px;border-radius:12px;font-weight:600}
-.t-pickup{background:#E1F5EE;color:#085041}
-.t-delivery{background:#E6F1FB;color:#0C447C}
-.t-proxy{background:#FAEEDA;color:#633806}
-.t-cash{background:#EAF3DE;color:#27500A}
-.t-unpaid{background:#FCEBEB;color:#791F1F}
-.t-paid{background:#E1F5EE;color:#085041}
-.t-wholesale{background:#FAEEDA;color:#633806}
-.oc-info{font-size:15px;color:#888;margin-bottom:10px;line-height:1.6}
-.oc-note{font-size:15px;color:#F97316;margin-bottom:10px;font-weight:500}
-.date-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-.date-row label{font-size:16px;color:#666;white-space:nowrap;font-weight:600}
-.qbtns{display:flex;gap:10px;flex-wrap:wrap}
-.qbtn{background:#F5F5F5;border:1px solid #DDD;border-radius:10px;padding:14px 20px;font-size:18px;cursor:pointer;color:#333;font-family:inherit;font-weight:600;min-height:50px}
-.qbtn:active{background:#EEE}
-.date-input{font-size:18px;border:1px solid #DDD;border-radius:10px;padding:12px 14px;color:#333;font-family:inherit;background:white;min-height:50px}
-.date-confirm-btn{background:#FFF7ED;border:2px solid #F97316;color:#EA580C;border-radius:10px;padding:14px 20px;font-size:18px;cursor:pointer;font-family:inherit;font-weight:700;min-height:50px}
-.action-row{display:flex;gap:12px;margin-top:4px}
-.btn-ship{flex:1;padding:16px 8px;border-radius:10px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;border:2px solid #1D9E75;background:#E1F5EE;color:#085041;min-height:56px}
-.btn-ship.on{background:#F5F5F5;border-color:#DDD;color:#999}
-.btn-paid{flex:1;padding:16px 8px;border-radius:10px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;border:2px solid #BA7517;background:#FAEEDA;color:#633806;min-height:56px}
-.btn-paid.on{background:#F5F5F5;border-color:#DDD;color:#999}
-.search-box{width:100%;border:1px solid #DDD;border-radius:10px;padding:14px 16px;font-size:17px;margin-bottom:14px;font-family:inherit;background:white}
-.filter-btn{border:1px solid #DDD;background:#F5F5F5;border-radius:20px;padding:10px 16px;font-size:15px;cursor:pointer;color:#666;font-family:inherit;transition:all .15s;font-weight:600;min-height:44px}
-.filter-btn.active{background:#F97316;border-color:#F97316;color:white;font-weight:500}
-.unpaid-summary{display:flex;justify-content:space-between;align-items:center;background:#FCEBEB;border:1px solid #F5B5B5;border-radius:10px;padding:14px 16px;margin-bottom:14px;font-size:15px;color:#791F1F}
-.unpaid-summary.none{background:#E1F5EE;border-color:#A7E0CC;color:#085041}
-.unpaid-summary b{font-size:19px}
-.unpaid-summary .us-stats{display:flex;gap:14px;flex-wrap:wrap}
-.batch-bar{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-.batch-btn{border:1px solid #DDD;background:white;border-radius:10px;padding:12px 14px;font-size:15px;cursor:pointer;color:#555;font-family:inherit;font-weight:600;min-height:46px}
-.batch-btn.batch-ship{border-color:#1D9E75;background:#E1F5EE;color:#085041}
-.batch-btn.batch-paid{border-color:#BA7517;background:#FAEEDA;color:#633806}
-.batch-btn:disabled{opacity:.4;cursor:not-allowed}
-.batch-count{font-size:14px;color:#999;margin-left:auto;font-weight:600}
-.big-overview{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
-.big-item{background:white;border-radius:12px;padding:16px 8px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
-.big-item.highlight{background:linear-gradient(135deg,#FFF7ED,#FFEDD5);border:1px solid #FDBA74}
-.big-label{font-size:14px;color:#888;margin-bottom:6px;font-weight:500}
-.big-value{font-size:34px;font-weight:700;color:#333;line-height:1.1}
-.big-item.highlight .big-value{color:#EA580C}
-.big-value.over{color:#E24B4A}
-.big-unit{font-size:16px;font-weight:500}
-.limit-row{display:flex;align-items:center;gap:8px;font-size:15px;color:#777;margin-bottom:16px;flex-wrap:wrap}
-.limit-row input{width:90px;border:1px solid #DDD;border-radius:8px;padding:8px 10px;font-size:16px;font-family:inherit}
-.limit-edit-btn,.limit-save-btn{border:1px solid #DDD;background:#F5F5F5;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;color:#666;font-family:inherit;font-weight:600}
-.limit-save-btn{border-color:#F97316;background:#FFF7ED;color:#EA580C}
-
-/* 統計分頁 */
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.stat-card{background:white;border-radius:12px;padding:14px 12px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
-.stat-card .si{font-size:24px;margin-bottom:6px}
-.stat-card .sv2{font-size:28px;font-weight:700;color:#333;line-height:1.2}
-.stat-card .sl2{font-size:14px;color:#999;margin-top:4px}
-.stat-card.paid .sv2{color:#1D9E75}
-.stat-card.unpaid .sv2{color:#E24B4A}
-.stat-block{background:white;border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
-.stat-line{display:flex;justify-content:space-between;align-items:center;font-size:15px;color:#555;margin-bottom:6px}
-.stat-line b{font-size:17px;color:#333}
-.progress-bar{height:8px;background:#F0F0F0;border-radius:4px;overflow:hidden;margin:6px 0 10px}
-.progress-fill{height:100%;background:#1D9E75;border-radius:4px;transition:width .3s}
-.progress-fill.delivery{background:#0C447C}
-.stat-sub{font-size:13px;color:#AAA;margin-top:4px}
-.oc-chk{display:flex;align-items:flex-start;gap:14px}
-.oc-chk input[type=checkbox]{width:30px;height:30px;margin-top:2px;flex-shrink:0;accent-color:#F97316}
-.oc-body{flex:1;min-width:0}
-.loading{text-align:center;color:#BBB;font-size:16px;padding:30px 0}
-.print-area{display:none}
-@media print{
-  @page{ size:A4 landscape; margin:10mm; }
-  body{max-width:100%}
-  .top-header,.tab-bar,.section,.print-btn-bar{display:none!important}
-  #print-sheet{display:block!important}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #f7f5f0;
+  color: #38332e;
+  font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
 }
-#print-sheet{display:none}
-.print-btn-bar{padding:12px 14px 0}
-.print-all-btn{width:100%;padding:16px;background:#333;color:white;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:4px;min-height:54px}
-/* 列印樣式 */
-#print-sheet{font-family:"PingFang TC","Microsoft JhengHei",sans-serif;padding:10px;font-size:16px}
-#print-sheet h2{font-size:18px;font-weight:700;margin-bottom:4px}
-#print-sheet .ps-meta{font-size:13px;color:#555;margin-bottom:10px}
-#print-sheet table{width:100%;border-collapse:collapse;font-size:15px}
-#print-sheet th{border:1px solid #999;padding:6px 8px;background:#F0F0F0;text-align:left;font-size:14px}
-#print-sheet td{border:1px solid #CCC;padding:7px 8px;vertical-align:top}
-#print-sheet .chk{width:28px;text-align:center}
-#print-sheet .ps-day{font-weight:700;font-size:16px;margin:12px 0 5px;border-bottom:2px solid #999;padding-bottom:3px}
-#print-sheet .ps-type{font-size:13px;font-weight:600;margin:6px 0 3px;color:#555}
-#print-sheet .n2{font-size:13px;color:#666;margin-top:2px}
+header {
+  background: #d97836;
+  color: white;
+  padding: 20px 16px;
+  text-align: center;
+}
+header h1 { margin: 0; font-size: 23px; }
+header p { margin: 7px 0 0; font-size: 13px; }
+main { max-width: 800px; margin: auto; padding: 14px; }
+nav {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+  margin-bottom: 16px;
+}
+button {
+  border: 0;
+  border-radius: 9px;
+  padding: 11px;
+  font: inherit;
+  cursor: pointer;
+}
+nav button { background: #eee6db; }
+nav button.active { background: #d97836; color: white; }
+.primary { background: #d97836; color: white; }
+.secondary { background: #eee6db; }
+.danger { background: #fff0eb; color: #a33c25; }
+.card {
+  background: white;
+  border-radius: 13px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px #00000009;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.summary { text-align: center; }
+.summary strong { display: block; font-size: 25px; color: #d97836; }
+.summary span { font-size: 13px; color: #777; }
+label { display: block; margin: 12px 0 5px; font-size: 14px; }
+input, select, textarea {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font: inherit;
+  background: white;
+}
+textarea { min-height: 65px; }
+h2 { font-size: 19px; }
+h3 { margin: 0 0 10px; font-size: 17px; }
+p { line-height: 1.6; }
+.muted { color: #777; font-size: 13px; }
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions button { flex: 1; }
+.pill {
+  display: inline-block;
+  background: #f8eadc;
+  padding: 5px 9px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+.hide { display: none; }
+.notice {
+  background: #fff3df;
+  border-radius: 9px;
+  padding: 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.delivery {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 12px;
+}
+.total { font-size: 22px; color: #c8692c; font-weight: bold; }
+@media print {
+  header, nav, button, .notice, .no-print { display: none !important; }
+  body { background: white; }
+  .card { box-shadow: none; border: 1px solid #ddd; }
+}
 </style>
 </head>
+
 <body>
+<header>
+  <h1>🍊 餘有榮焉</h1>
+  <p>今天的陽光，成就今天的甜。</p>
+</header>
 
-<div class="top-header">
-  <h1>🍊 砂糖橘後台管理</h1>
-  <button class="reload-btn" onclick="loadOrders()">重新整理</button>
-</div>
-
-<div class="tab-bar">
-  <button class="tab active" onclick="sw('arrange',this)">待安排<span class="badge" id="badge-arrange" style="display:none">0</span></button>
-  <button class="tab" onclick="sw('today',this)">今日出貨</button>
-  <button class="tab" onclick="sw('upcoming',this)">出貨預覽</button>
-  <button class="tab" onclick="sw('search',this)">查訂單</button>
-  <button class="tab" onclick="sw('stats',this)">統計</button>
-</div>
-
-<div class="print-btn-bar">
-  <button class="print-all-btn" onclick="printAll()">🖨️ 列印所有未出貨清單</button>
-</div>
-
-<!-- 列印用（不顯示在螢幕） -->
-<div id="print-sheet"></div>
-
-<!-- 待安排 -->
-<div id="arrange" class="section active">
-  <div style="display:flex;gap:6px;margin-bottom:10px">
-    <button class="filter-btn active" data-group="arrange-type" onclick="setArrangeTypeFilter('all',this)">全部</button>
-    <button class="filter-btn" data-group="arrange-type" onclick="setArrangeTypeFilter('自取',this)">🏪 自取</button>
-    <button class="filter-btn" data-group="arrange-type" onclick="setArrangeTypeFilter('宅配',this)">🚛 宅配</button>
+<main>
+  <div class="notice">
+    目前為測試預覽版：不需 LINE 登入，資料只保存在這台瀏覽器，
+    不會寫入正式 Google 試算表。
   </div>
-  <div id="arrange-list"><div class="loading">載入中...</div></div>
-</div>
 
-<!-- 今日出貨 -->
-<div id="today" class="section">
-  <div class="big-overview">
-    <div class="big-item">
-      <div class="big-label">今天要出</div>
-      <div class="big-value" id="big-today">0<span class="big-unit">盒</span></div>
+  <div class="grid">
+    <div class="card summary">
+      <strong id="orderCount">0</strong>
+      <span>訂單數</span>
     </div>
-    <div class="big-item">
-      <div class="big-label">明天預計</div>
-      <div class="big-value" id="big-tomorrow">0<span class="big-unit">盒</span></div>
+    <div class="card summary">
+      <strong id="boxCount">0</strong>
+      <span>訂購盒數</span>
     </div>
-    <div class="big-item highlight">
-      <div class="big-label">還可再接</div>
-      <div class="big-value" id="big-remain">0<span class="big-unit">盒</span></div>
+    <div class="card summary">
+      <strong id="unpaidCount">0</strong>
+      <span>待收款配送</span>
     </div>
-  </div>
-  <div class="limit-row" id="limit-row">
-    <span>今日採收上限：<b id="limit-display">—</b> 盒</span>
-    <button class="limit-edit-btn" id="limit-edit-btn" onclick="editStockLimit()">✏️ 編輯</button>
-  </div>
-  <div class="day-nav">
-    <button onclick="chDay(-1)">‹</button>
-    <span class="day-label" id="today-label"></span>
-    <button onclick="chDay(1)">›</button>
-    <button onclick="window.print()" style="background:white;border:1px solid #DDD;border-radius:8px;padding:10px 14px;cursor:pointer;font-size:14px;color:#666;font-weight:600">列印</button>
-  </div>
-  <div style="display:flex;gap:6px;margin-bottom:10px">
-    <button class="filter-btn active" data-group="today-type" onclick="setTodayTypeFilter('all',this)">全部</button>
-    <button class="filter-btn" data-group="today-type" onclick="setTodayTypeFilter('自取',this)">🏪 自取</button>
-    <button class="filter-btn" data-group="today-type" onclick="setTodayTypeFilter('宅配',this)">🚛 宅配</button>
-  </div>
-  <div class="summary-row">
-    <div class="scard"><div class="sl">自取</div><div class="sv" id="s-pickup">0</div></div>
-    <div class="scard"><div class="sl">宅配</div><div class="sv" id="s-delivery">0</div></div>
-    <div class="scard hi"><div class="sl">合計採收</div><div class="sv" id="s-total">0 盒</div></div>
-  </div>
-  <div class="batch-bar">
-    <button class="batch-btn" id="select-all-btn" onclick="toggleSelectAll()">☐ 全選</button>
-    <button class="batch-btn batch-ship" id="batch-ship-btn" onclick="batchMarkShipped()" disabled>📦 已選標記出貨</button>
-    <button class="batch-btn batch-paid" id="batch-paid-btn" onclick="batchMarkPaid()" disabled>💰 已選標記收款</button>
-    <span class="batch-count" id="batch-count"></span>
-  </div>
-  <div class="sec-hd" id="sec-pickup-hd">自取訂單</div>
-  <div id="list-pickup"></div>
-  <div class="sec-hd" id="sec-delivery-hd">宅配訂單</div>
-  <div id="list-delivery"></div>
-</div>
-
-<!-- 出貨預覽 -->
-<div id="upcoming" class="section">
-  <div class="sec-hd">未來7天出貨量</div>
-  <div id="upcoming-list"></div>
-</div>
-
-<!-- 查訂單 -->
-<div id="search" class="section">
-  <input class="search-box" type="text" id="search-input" placeholder="輸入姓名或電話搜尋..." oninput="doSearch()">
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-    <button class="filter-btn active" onclick="setFilter('pay','all',this)" data-group="pay">💰 全部</button>
-    <button class="filter-btn" onclick="setFilter('pay','待匯款',this)" data-group="pay">待匯款</button>
-    <button class="filter-btn" onclick="setFilter('pay','已收款',this)" data-group="pay">已收款</button>
-    <div style="width:1px;background:#EEE;margin:0 2px"></div>
-    <button class="filter-btn active" onclick="setFilter('ship','all',this)" data-group="ship">📦 全部</button>
-    <button class="filter-btn" onclick="setFilter('ship','待出貨',this)" data-group="ship">待出貨</button>
-    <button class="filter-btn" onclick="setFilter('ship','已出貨',this)" data-group="ship">已出貨</button>
-  </div>
-  <div id="unpaid-summary"></div>
-  <div id="search-results"></div>
-</div>
-
-<!-- 統計 -->
-<div id="stats" class="section">
-  <div class="stat-grid">
-    <div class="stat-card">
-      <div class="si">📋</div>
-      <div class="sv2" id="st-order-count">0</div>
-      <div class="sl2">總訂單數</div>
-    </div>
-    <div class="stat-card">
-      <div class="si">🍊</div>
-      <div class="sv2" id="st-total-boxes">0</div>
-      <div class="sl2">總接單盒數</div>
+    <div class="card summary">
+      <strong id="pendingCount">0</strong>
+      <span>待出貨配送</span>
     </div>
   </div>
 
-  <div class="sec-hd">出貨進度</div>
-  <div class="stat-block">
-    <div class="stat-line"><span>已出貨</span><b id="st-shipped-boxes">0 盒</b></div>
-    <div class="progress-bar"><div class="progress-fill" id="st-ship-fill" style="width:0%"></div></div>
-    <div class="stat-line"><span>待出貨</span><b id="st-unshipped-boxes">0 盒</b></div>
-    <div class="stat-sub" id="st-ship-sub"></div>
-  </div>
+  <nav>
+    <button class="active" data-page="orders">訂單</button>
+    <button data-page="payments">收款</button>
+    <button data-page="shipping">出貨</button>
+    <button data-page="create">＋新增</button>
+  </nav>
 
-  <div class="sec-hd">收款狀況</div>
-  <div class="stat-grid">
-    <div class="stat-card paid">
-      <div class="si">🟢</div>
-      <div class="sv2" id="st-paid-amount">NT$0</div>
-      <div class="sl2">已收金額</div>
+  <section id="orders">
+    <h2>訂單管理</h2>
+    <input id="search" placeholder="搜尋姓名、電話、訂單編號">
+    <div id="orderList"></div>
+  </section>
+
+  <section id="payments" class="hide">
+    <h2>收款管理</h2>
+    <div id="paymentList"></div>
+  </section>
+
+  <section id="shipping" class="hide">
+    <div class="row">
+      <h2>出貨管理</h2>
+      <button class="secondary" onclick="window.print()">列印</button>
     </div>
-    <div class="stat-card unpaid">
-      <div class="si">🔴</div>
-      <div class="sv2" id="st-unpaid-amount">NT$0</div>
-      <div class="sl2">待收金額</div>
+    <div id="shippingList"></div>
+  </section>
+
+  <section id="create" class="hide">
+    <h2>新增電話／口頭訂單</h2>
+    <div class="card">
+      <label>訂購人姓名</label>
+      <input id="buyerName" placeholder="請輸入姓名">
+
+      <label>訂購人電話</label>
+      <input id="buyerPhone" type="tel" placeholder="09xxxxxxxx">
+
+      <label>訂單備註</label>
+      <textarea id="orderNote"></textarea>
+
+      <div id="deliveryForms"></div>
+
+      <button class="secondary" onclick="addDelivery()">
+        ＋ 新增宅配地址／自取
+      </button>
+
+      <p class="muted">
+        砂糖橘每盒 NT$400；宅配每 4 盒一件，每件 NT$150。
+        不同宅配地址分開計算運費。
+      </p>
+
+      <p class="total" id="estimate">NT$0</p>
+
+      <button class="primary" style="width:100%" onclick="createOrder()">
+        建立測試訂單
+      </button>
     </div>
-  </div>
-  <div class="stat-block">
-    <div class="progress-bar"><div class="progress-fill" id="st-paid-fill" style="width:0%"></div></div>
-    <div class="stat-sub" id="st-paid-sub"></div>
-  </div>
-
-  <div class="sec-hd">取貨方式</div>
-  <div class="stat-block">
-    <div class="stat-line"><span>🏪 自取</span><b id="st-pickup">0 筆 / 0 盒</b></div>
-    <div class="progress-bar"><div class="progress-fill" id="st-pickup-fill" style="width:0%"></div></div>
-    <div class="stat-line"><span>🚛 宅配</span><b id="st-delivery">0 筆 / 0 盒</b></div>
-    <div class="progress-bar"><div class="progress-fill delivery" id="st-delivery-fill" style="width:0%"></div></div>
-  </div>
-
-  <div class="sec-hd">季節庫存</div>
-  <div class="stat-block">
-    <div class="stat-line"><span>總庫存</span><b id="st-stock-total">0 盒</b></div>
-    <div class="stat-line"><span>已售出</span><b id="st-stock-sold">0 盒</b></div>
-    <div class="stat-line"><span>剩餘可訂</span><b id="st-stock-remain">0 盒</b></div>
-    <div class="progress-bar"><div class="progress-fill" id="st-stock-fill" style="width:0%"></div></div>
-  </div>
-</div>
+  </section>
+</main>
 
 <script>
-var API = 'https://sugarorange-api.vercel.app/api/order';
-var orders = [];
-var stockLimit = 0;
-var totalStock = 0, soldStock = 0, remainStock = 0;
-var base = new Date(); base.setHours(0,0,0,0);
-var viewDay = new Date(base);
-var currentTab = 'arrange';
+"use strict";
 
-function fmt(d){ return d.toISOString().slice(0,10); }
-function addD(d,n){ var r=new Date(d); r.setDate(r.getDate()+n); return r; }
-function parseD(s){ if(!s) return null; var p=s.split('-'); return new Date(+p[0],+p[1]-1,+p[2]); }
-function wd(d){ return['日','一','二','三','四','五','六'][d.getDay()]; }
-function fmtDisplay(d){
-  var diff=Math.round((d-base)/86400000);
-  var s=(d.getMonth()+1)+'/'+d.getDate()+'（'+wd(d)+'）';
-  if(diff===0) return s+' 今天';
-  if(diff===1) return s+' 明天';
-  if(diff===2) return s+' 後天';
-  if(diff===-1) return s+' 昨天';
-  return s;
+// 此版本為獨立預覽版，不連接正式後端。
+const PRICE = 400;
+const BOXES_PER_PIECE = 4;
+const SHIPPING_FEE = 150;
+const STORAGE_KEY = "youyu_admin_demo_v1";
+
+const $ = id => document.getElementById(id);
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
 }
 
-async function loadOrders(){
-  try {
-    var res = await fetch(API+'?action=getOrders');
-    var data = await res.json();
-    if(data.status==='success'){
-      orders = data.orders;
-      stockLimit = data.stockLimit || 0;
-      totalStock = data.totalStock || 0;
-      soldStock = data.soldStock || 0;
-      remainStock = data.remainStock || 0;
+function money(value) {
+  return "NT$" + Number(value || 0).toLocaleString("zh-TW");
+}
+
+function today() {
+  return new Date().toLocaleDateString("sv-SE", {
+    timeZone: "Asia/Taipei"
+  });
+}
+
+function makeId() {
+  return "SO-" + Date.now() + "-" +
+    Math.random().toString(36).slice(2, 7).toUpperCase();
+}
+
+function demoData() {
+  return [
+    {
+      id: "DEMO-001",
+      buyer: "測試客戶 A",
+      phone: "0900000000",
+      note: "測試資料",
+      deliveries: [
+        {
+          id: "D-001",
+          type: "宅配",
+          name: "測試收件人",
+          phone: "0900000000",
+          address: "測試地址（非真實地址）",
+          qty: 3,
+          shipping: 150,
+          paid: false,
+          shipped: false,
+          shipDate: "",
+          note: ""
+        }
+      ]
+    },
+    {
+      id: "DEMO-002",
+      buyer: "測試客戶 B",
+      phone: "0911111111",
+      note: "",
+      deliveries: [
+        {
+          id: "D-002",
+          type: "自取",
+          name: "測試客戶 B",
+          phone: "0911111111",
+          address: "",
+          qty: 2,
+          shipping: 0,
+          paid: true,
+          shipped: false,
+          shipDate: today(),
+          note: ""
+        }
+      ]
     }
-    renderAll();
-  } catch(e) {
-    document.getElementById('arrange-list').innerHTML='<div class="loading">載入失敗，請重新整理</div>';
-  }
-}
-
-function renderAll(){
-  renderArrange();
-  renderToday();
-  renderUpcoming();
-  if(currentTab==='search') doSearch();
-  if(currentTab==='stats') renderStats();
-}
-
-function sw(id, btn){
-  document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('active');});
-  document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active');});
-  btn.classList.add('active');
-  document.getElementById(id).classList.add('active');
-  currentTab = id;
-  if(id==='search') doSearch();
-  if(id==='stats') renderStats();
-}
-
-function chDay(n){ viewDay=addD(viewDay,n); renderToday(); }
-
-// ── 待安排
-var arrangeTypeFilter = 'all';
-
-function setArrangeTypeFilter(val, btn){
-  arrangeTypeFilter = val;
-  document.querySelectorAll('.filter-btn[data-group="arrange-type"]').forEach(function(b){
-    b.classList.remove('active');
-  });
-  btn.classList.add('active');
-  renderArrange();
-}
-
-function renderArrange(){
-  var list = orders.filter(function(o){ return !o.shipDate && o.shipStatus!=='已出貨'; });
-  var badge = document.getElementById('badge-arrange');
-  if(list.length){ badge.textContent=list.length; badge.style.display=''; }
-  else { badge.style.display='none'; }
-
-  if(arrangeTypeFilter!=='all'){
-    list = list.filter(function(o){ return o.type===arrangeTypeFilter; });
-  }
-
-  var el = document.getElementById('arrange-list');
-  if(!list.length){
-    el.innerHTML='<div class="empty-msg">'+(arrangeTypeFilter==='all'?'所有訂單都已安排出貨日 ✓':'目前沒有符合條件的訂單')+'</div>';
-    return;
-  }
-  el.innerHTML = list.map(function(o){ return arrangeCard(o); }).join('');
-}
-
-var BIG_ORDER_THRESHOLD = 100; // 大單門檻（盒）
-
-function arrangeCard(o){
-  var tags = typeTags(o);
-  var isBig = o.qty >= BIG_ORDER_THRESHOLD;
-  if(isBig) tags += ' <span class="tag tag-big">⚡大單</span>';
-  var note = o.note ? '<div class="oc-note">📝 '+o.note+'</div>' : '';
-  var phone = o.phone ? o.phone+' · ' : '';
-  var cls = 'ocard no-date'+(isBig?' big-order':'');
-  return '<div class="'+cls+'" id="ac-'+o.rowIndex+'">'+
-    '<div class="oc-id">'+o.orderId+'</div>'+
-    '<div class="oc-top"><div class="oc-name">'+o.name+'</div><div class="oc-boxes">'+o.qty+' 盒</div></div>'+
-    '<div class="oc-tags">'+tags+'</div>'+
-    '<div class="oc-info">'+phone+o.amount+'元</div>'+
-    note+
-    '<div class="date-row"><label>出貨日</label>'+
-    '<div class="qbtns">'+
-    '<button class="qbtn" onclick="setDate('+o.rowIndex+',0)">今天</button>'+
-    '<button class="qbtn" onclick="setDate('+o.rowIndex+',1)">明天</button>'+
-    '<button class="qbtn" onclick="setDate('+o.rowIndex+',2)">後天</button>'+
-    '<input class="date-input" type="date" id="date-input-'+o.rowIndex+'" onchange="onDatePicked('+o.rowIndex+',this.value)">'+
-    '<button class="date-confirm-btn" id="date-confirm-'+o.rowIndex+'" style="display:none" onclick="confirmDate('+o.rowIndex+')"></button>'+
-    '</div></div></div>';
-}
-
-async function setDate(rowIndex, n){
-  var d = fmt(addD(base,n));
-  await fetch(API+'?action=setShipDate&rowIndex='+rowIndex+'&shipDate='+d);
-  var o = orders.find(function(x){return x.rowIndex===rowIndex;});
-  if(o) o.shipDate = d;
-  renderAll();
-}
-var pendingDates = {};
-
-// 手機原生日期選擇器點開時可能會先帶入「今天」並觸發 onchange，
-// 所以這裡先暫存選擇的日期，顯示確認按鈕，等使用者按下確認才真正送出
-function onDatePicked(rowIndex, val){
-  if(!val) return;
-  pendingDates[rowIndex] = val;
-  var btn = document.getElementById('date-confirm-'+rowIndex);
-  if(!btn) return;
-  var d = parseD(val);
-  var label = (d.getMonth()+1)+'/'+d.getDate();
-  btn.textContent = '✓ 設為 '+label;
-  btn.style.display = '';
-}
-
-async function confirmDate(rowIndex){
-  var val = pendingDates[rowIndex];
-  if(!val) return;
-  await setDateVal(rowIndex, val);
-}
-
-async function setDateVal(rowIndex, val){
-  if(!val) return;
-  await fetch(API+'?action=setShipDate&rowIndex='+rowIndex+'&shipDate='+val);
-  var o = orders.find(function(x){return x.rowIndex===rowIndex;});
-  if(o) o.shipDate = val;
-  delete pendingDates[rowIndex];
-  renderAll();
-}
-
-// ── 今日出貨
-var selectedRows = new Set();
-var todayRowIndexes = [];
-var todayTypeFilter = 'all';
-
-function setTodayTypeFilter(val, btn){
-  todayTypeFilter = val;
-  document.querySelectorAll('.filter-btn[data-group="today-type"]').forEach(function(b){
-    b.classList.remove('active');
-  });
-  btn.classList.add('active');
-  renderToday();
-}
-
-function renderToday(){
-  var vds = fmt(viewDay);
-  document.getElementById('today-label').textContent = fmtDisplay(viewDay);
-  var day = orders.filter(function(o){ return o.shipDate===vds; });
-  var pu = day.filter(function(o){return o.type==='自取';});
-  var de = day.filter(function(o){return o.type==='宅配';});
-  var puB = pu.reduce(function(s,o){return s+o.qty;},0);
-  var deB = de.reduce(function(s,o){return s+o.qty;},0);
-  document.getElementById('s-pickup').textContent = puB+' 盒';
-  document.getElementById('s-delivery').textContent = deB+' 盒';
-  document.getElementById('s-total').textContent = (puB+deB)+' 盒';
-
-  // 依篩選決定顯示哪些區塊
-  var showPu = todayTypeFilter==='all' || todayTypeFilter==='自取';
-  var showDe = todayTypeFilter==='all' || todayTypeFilter==='宅配';
-  document.getElementById('sec-pickup-hd').style.display = showPu ? '' : 'none';
-  document.getElementById('list-pickup').style.display = showPu ? '' : 'none';
-  document.getElementById('sec-delivery-hd').style.display = showDe ? '' : 'none';
-  document.getElementById('list-delivery').style.display = showDe ? '' : 'none';
-
-  document.getElementById('list-pickup').innerHTML = pu.length ? pu.map(todayCard).join('') : '<div class="empty-msg">今天沒有自取</div>';
-  document.getElementById('list-delivery').innerHTML = de.length ? de.map(todayCard).join('') : '<div class="empty-msg">今天沒有宅配</div>';
-
-  // 全選/批次操作只作用於目前篩選後可見的訂單
-  var visible = [];
-  if(showPu) visible = visible.concat(pu);
-  if(showDe) visible = visible.concat(de);
-  todayRowIndexes = visible.map(function(o){return o.rowIndex;});
-
-  // 換頁/換篩選時，只保留還存在的勾選
-  var keep = new Set();
-  selectedRows.forEach(function(r){ if(todayRowIndexes.indexOf(r)!==-1) keep.add(r); });
-  selectedRows = keep;
-  updateBatchBar();
-
-  renderBigOverview();
-}
-
-// ── 頂部大字總覽：今天/明天/還可再接
-function renderBigOverview(){
-  var todayStr = fmt(base);
-  var tomorrowStr = fmt(addD(base,1));
-  var todayTotal = orders.filter(function(o){return o.shipDate===todayStr;}).reduce(function(s,o){return s+o.qty;},0);
-  var tomorrowTotal = orders.filter(function(o){return o.shipDate===tomorrowStr;}).reduce(function(s,o){return s+o.qty;},0);
-  var remain = stockLimit - todayTotal;
-
-  document.getElementById('big-today').innerHTML = todayTotal+'<span class="big-unit">盒</span>';
-  document.getElementById('big-tomorrow').innerHTML = tomorrowTotal+'<span class="big-unit">盒</span>';
-  var remainEl = document.getElementById('big-remain');
-  remainEl.innerHTML = remain+'<span class="big-unit">盒</span>';
-  remainEl.classList.toggle('over', remain < 0);
-
-  var limitDisplay = document.getElementById('limit-display');
-  if(limitDisplay) limitDisplay.textContent = stockLimit>0 ? stockLimit : '尚未設定';
-}
-
-// ── 編輯今日採收上限
-function editStockLimit(){
-  var row = document.getElementById('limit-row');
-  row.innerHTML =
-    '<span>今日採收上限：</span>'+
-    '<input type="number" id="limit-input" value="'+(stockLimit||'')+'" placeholder="輸入盒數">'+
-    '<button class="limit-save-btn" onclick="saveStockLimit()">儲存</button>'+
-    '<button class="limit-edit-btn" onclick="renderBigOverviewAndCancel()">取消</button>';
-  document.getElementById('limit-input').focus();
-}
-
-function renderBigOverviewAndCancel(){
-  var row = document.getElementById('limit-row');
-  row.innerHTML =
-    '<span>今日採收上限：<b id="limit-display">'+(stockLimit>0?stockLimit:'尚未設定')+'</b> 盒</span>'+
-    '<button class="limit-edit-btn" id="limit-edit-btn" onclick="editStockLimit()">✏️ 編輯</button>';
-}
-
-async function saveStockLimit(){
-  var val = document.getElementById('limit-input').value;
-  var n = parseInt(val,10);
-  if(isNaN(n) || n<0){ alert('請輸入正確的盒數'); return; }
-  var btn = document.querySelector('.limit-save-btn');
-  btn.textContent = '儲存中...';
-  await fetch(API+'?action=setStockLimit&limit='+n);
-  stockLimit = n;
-  renderBigOverviewAndCancel();
-  renderBigOverview();
-}
-
-function toggleSelectRow(rowIndex, checked){
-  if(checked) selectedRows.add(rowIndex);
-  else selectedRows.delete(rowIndex);
-  updateBatchBar();
-}
-
-function toggleSelectAll(){
-  var allSelected = todayRowIndexes.length>0 && todayRowIndexes.every(function(r){return selectedRows.has(r);});
-  if(allSelected){
-    selectedRows.clear();
-  } else {
-    todayRowIndexes.forEach(function(r){selectedRows.add(r);});
-  }
-  // 同步畫面上的 checkbox
-  todayRowIndexes.forEach(function(r){
-    var el = document.getElementById('chk-'+r);
-    if(el) el.checked = selectedRows.has(r);
-  });
-  updateBatchBar();
-}
-
-function updateBatchBar(){
-  var selBtn = document.getElementById('select-all-btn');
-  var shipBtn = document.getElementById('batch-ship-btn');
-  var paidBtn = document.getElementById('batch-paid-btn');
-  var countEl = document.getElementById('batch-count');
-  if(!selBtn) return;
-  var allSelected = todayRowIndexes.length>0 && todayRowIndexes.every(function(r){return selectedRows.has(r);});
-  selBtn.textContent = allSelected ? '☑ 取消全選' : '☐ 全選';
-  var n = selectedRows.size;
-  shipBtn.disabled = n===0;
-  paidBtn.disabled = n===0;
-  countEl.textContent = n>0 ? '已選 '+n+' 筆' : '';
-}
-
-function todayCard(o){
-  var done = o.shippedAt && o.paidAt;
-  var tags = typeTags(o);
-  var note = o.note ? '<div class="oc-note">📝 '+o.note+'</div>' : '';
-  var phone = o.phone ? o.phone : '';
-  var checked = selectedRows.has(o.rowIndex) ? ' checked' : '';
-  return '<div class="ocard'+(done?' done':'')+'" id="tc-'+o.rowIndex+'">'+
-    '<div class="oc-chk">'+
-    '<input type="checkbox" id="chk-'+o.rowIndex+'" onchange="toggleSelectRow('+o.rowIndex+',this.checked)"'+checked+'>'+
-    '<div class="oc-body">'+
-    '<div class="oc-id">'+o.orderId+'</div>'+
-    '<div class="oc-top"><div class="oc-name'+(done?' crossed':'')+'">'+o.name+'</div><div class="oc-boxes">'+o.qty+' 盒</div></div>'+
-    '<div class="oc-tags">'+tags+'</div>'+
-    (phone?'<div class="oc-info">'+phone+'</div>':'')+
-    note+
-    '<div class="action-row">'+
-    '<button class="btn-ship'+(o.shippedAt?' on':'')+'" onclick="toggleShip('+o.rowIndex+')">'+(o.shippedAt?'✓ 已出貨':'出貨')+'</button>'+
-    '<button class="btn-paid'+(o.paidAt?' on':'')+'" onclick="togglePaid('+o.rowIndex+')">'+(o.paidAt?'✓ 已收款':'收款')+'</button>'+
-    '</div>'+
-    (o.type==='宅配' ? '<button id="copy-btn-'+o.rowIndex+'" onclick="copyLabel('+o.rowIndex+')" style="width:100%;margin-top:10px;padding:14px 8px;border-radius:10px;border:2px solid #DDD;background:#F5F5F5;color:#555;font-size:17px;font-weight:600;cursor:pointer;font-family:inherit;min-height:50px">📋 複製出貨標籤</button>' : '')+
-    '</div></div></div>';
-}
-
-async function toggleShip(rowIndex){
-  var o = orders.find(function(x){return x.rowIndex===rowIndex;});
-  if(!o) return;
-  var undo = o.shippedAt ? '1' : '0';
-  var res = await fetch(API+'?action=markShipped&rowIndex='+rowIndex+'&undo='+undo);
-  var data = await res.json();
-  o.shippedAt = data.shippedAt || '';
-  o.shipStatus = o.shippedAt ? '已出貨' : '待出貨';
-  renderToday();
-}
-
-async function togglePaid(rowIndex){
-  var o = orders.find(function(x){return x.rowIndex===rowIndex;});
-  if(!o) return;
-  var undo = o.paidAt ? '1' : '0';
-  var res = await fetch(API+'?action=markPaid&rowIndex='+rowIndex+'&undo='+undo+'&deliveryType='+encodeURIComponent(o.type));
-  var data = await res.json();
-  o.paidAt = data.paidAt || '';
-  o.payStatus = o.paidAt ? '已收款' : (o.type==='宅配'?'待匯款':'取貨付款');
-  renderToday();
-}
-
-// ── 批次標記出貨（跳過已是該狀態，逐筆 await，避免 Sheets 寫入衝突）
-async function batchMarkShipped(){
-  var rows = Array.from(selectedRows);
-  var targets = rows.map(function(r){return orders.find(function(x){return x.rowIndex===r;});})
-    .filter(function(o){return o && !o.shippedAt;});
-  if(!targets.length){ alert('所選訂單都已是「已出貨」狀態'); return; }
-
-  var btn = document.getElementById('batch-ship-btn');
-  var shipBtn2 = document.getElementById('batch-paid-btn');
-  var selBtn = document.getElementById('select-all-btn');
-  var orig = btn.textContent;
-  btn.disabled = true; shipBtn2.disabled = true; selBtn.disabled = true;
-
-  for(var i=0;i<targets.length;i++){
-    var o = targets[i];
-    btn.textContent = '處理中 ('+(i+1)+'/'+targets.length+')...';
-    var res = await fetch(API+'?action=markShipped&rowIndex='+o.rowIndex+'&undo=0');
-    var data = await res.json();
-    o.shippedAt = data.shippedAt || '';
-    o.shipStatus = o.shippedAt ? '已出貨' : '待出貨';
-  }
-
-  btn.textContent = orig;
-  selBtn.disabled = false;
-  selectedRows.clear();
-  renderToday();
-}
-
-// ── 批次標記收款（跳過已是該狀態，逐筆 await，避免 Sheets 寫入衝突）
-async function batchMarkPaid(){
-  var rows = Array.from(selectedRows);
-  var targets = rows.map(function(r){return orders.find(function(x){return x.rowIndex===r;});})
-    .filter(function(o){return o && !o.paidAt;});
-  if(!targets.length){ alert('所選訂單都已是「已收款」狀態'); return; }
-
-  var btn = document.getElementById('batch-paid-btn');
-  var shipBtn2 = document.getElementById('batch-ship-btn');
-  var selBtn = document.getElementById('select-all-btn');
-  var orig = btn.textContent;
-  btn.disabled = true; shipBtn2.disabled = true; selBtn.disabled = true;
-
-  for(var i=0;i<targets.length;i++){
-    var o = targets[i];
-    btn.textContent = '處理中 ('+(i+1)+'/'+targets.length+')...';
-    var res = await fetch(API+'?action=markPaid&rowIndex='+o.rowIndex+'&undo=0&deliveryType='+encodeURIComponent(o.type));
-    var data = await res.json();
-    o.paidAt = data.paidAt || '';
-    o.payStatus = o.paidAt ? '已收款' : (o.type==='宅配'?'待匯款':'取貨付款');
-  }
-
-  btn.textContent = orig;
-  selBtn.disabled = false;
-  selectedRows.clear();
-  renderToday();
-}
-
-// ── 出貨預覽
-function renderUpcoming(){
-  var html = '';
-  for(var i=0; i<=6; i++){
-    var d = addD(base,i);
-    var ds = fmt(d);
-    var day = orders.filter(function(o){return o.shipDate===ds;});
-    if(!day.length) continue;
-    var pu = day.filter(function(o){return o.type==='自取';}).reduce(function(s,o){return s+o.qty;},0);
-    var de = day.filter(function(o){return o.type==='宅配';}).reduce(function(s,o){return s+o.qty;},0);
-    html += '<div class="ocard" style="margin-bottom:8px">'+
-      '<div class="oc-top">'+
-      '<span style="font-size:15px;font-weight:600">'+fmtDisplay(d)+'</span>'+
-      '<span style="font-size:15px;font-weight:600;color:#1D9E75">'+(pu+de)+' 盒</span>'+
-      '</div>'+
-      '<div class="oc-tags" style="margin-top:6px">'+
-      '<span class="tag t-pickup">自取 '+pu+' 盒</span>'+
-      '<span class="tag t-delivery">宅配 '+de+' 盒</span>'+
-      '</div>'+
-      '<div style="font-size:12px;color:#999;margin-top:6px">'+
-      day.map(function(o){return o.name+' '+o.qty+'盒';}).join('　')+
-      '</div></div>';
-  }
-  if(!html) html = '<div class="empty-msg">未來7天沒有出貨安排</div>';
-  document.getElementById('upcoming-list').innerHTML = html;
-}
-
-// ── 查訂單
-var filterPay = 'all';
-var filterShip = 'all';
-
-function setFilter(group, val, btn){
-  if(group==='pay') filterPay = val;
-  if(group==='ship') filterShip = val;
-  document.querySelectorAll('.filter-btn[data-group="'+group+'"]').forEach(function(b){
-    b.classList.remove('active');
-  });
-  btn.classList.add('active');
-  doSearch();
-}
-
-function doSearch(){
-  var q = document.getElementById('search-input').value.trim();
-  var el = document.getElementById('search-results');
-  var sumEl = document.getElementById('unpaid-summary');
-  var res = orders.filter(function(o){
-    var matchQ = !q || o.name.includes(q) || o.phone.includes(q) || o.orderId.includes(q);
-    var matchPay = filterPay==='all' ||
-      (filterPay==='待匯款' && o.payStatus==='待匯款') ||
-      (filterPay==='已收款' && o.paidAt);
-    var matchShip = filterShip==='all' ||
-      (filterShip==='待出貨' && !o.shippedAt) ||
-      (filterShip==='已出貨' && o.shippedAt);
-    return matchQ && matchPay && matchShip;
-  });
-
-  // ── 未收款總覽（依目前篩選結果計算）
-  var unpaid = res.filter(function(o){return !o.paidAt;});
-  if(!res.length){
-    sumEl.innerHTML='';
-  } else if(unpaid.length){
-    var uBoxes = unpaid.reduce(function(s,o){return s+o.qty;},0);
-    var uAmount = unpaid.reduce(function(s,o){return s+(o.totalAmount||o.amount||0);},0);
-    sumEl.className = 'unpaid-summary';
-    sumEl.innerHTML = '<div class="us-stats">'+
-      '<span>🔴 未收款 <b>'+unpaid.length+'</b> 筆</span>'+
-      '<span><b>'+uBoxes+'</b> 盒</span>'+
-      '<span>NT$ <b>'+uAmount.toLocaleString()+'</b></span>'+
-      '</div>';
-  } else {
-    sumEl.className = 'unpaid-summary none';
-    sumEl.innerHTML = '✅ 目前篩選結果全部已收款';
-  }
-
-  if(!res.length){
-    el.innerHTML='<div class="empty-msg">'+(q?'找不到「'+q+'」':'沒有符合條件的訂單')+'</div>';
-    return;
-  }
-  el.innerHTML = res.map(function(o){
-    var tags = typeTags(o);
-    var note = o.note?'<div class="oc-note">📝 '+o.note+'</div>':'';
-    var addr = o.type==='宅配'?'<div class="oc-info" style="font-size:11px">📦 '+o.address+'</div>':'';
-    return '<div class="ocard">'+
-      '<div class="oc-id">'+o.orderId+'</div>'+
-      '<div class="oc-top"><div class="oc-name">'+o.name+'</div><div class="oc-boxes">'+o.qty+' 盒</div></div>'+
-      '<div class="oc-tags">'+tags+'</div>'+
-      '<div class="oc-info">'+(o.phone?o.phone+' · ':'')+o.amount+'元 · '+(o.shipDate?fmtDisplay(parseD(o.shipDate)):'尚未安排出貨日')+'</div>'+
-      addr+note+
-      '<div class="oc-info" style="margin-top:4px">'+
-      (o.shippedAt?'🟠 已出貨 '+o.shippedAt:'🔲 未出貨')+' &nbsp; '+
-      (o.paidAt?'🟢 已收款 '+o.paidAt:'🔲 未收款')+
-      '</div></div>';
-  }).join('');
-}
-
-function copyLabel(rowIndex){
-  var o = orders.find(function(x){return x.rowIndex===rowIndex;});
-  if(!o) return;
-  var d = o.shipDate ? (function(){
-    var p=o.shipDate.split('-');
-    var dt=new Date(+p[0],+p[1]-1,+p[2]);
-    return (dt.getMonth()+1)+'/'+dt.getDate();
-  })() : '待安排';
-  var sep = '--------------';
-  var lines = [
-    '餘有榮焉 砂糖橘',
-    sep,
-    '收：' + o.name,
-    '電話：' + (o.phone || '—'),
-    '地址：' + o.address,
-    '數量：' + o.qty + ' 盒（5斤裝）',
-    '單號：' + o.orderId,
-    '出貨日：' + d,
-    sep,
-    '寄：謝小姐 0937-331355',
-    '苗栗縣公館鄉館東村和東街46號'
   ];
-  var text = lines.join('\n');
-  navigator.clipboard.writeText(text).then(function(){
-    var btn = document.getElementById('copy-btn-'+rowIndex);
-    var orig = btn.textContent;
-    btn.textContent = '✓ 已複製！';
-    btn.style.background = '#1D9E75';
-    btn.style.color = 'white';
-    setTimeout(function(){ btn.textContent=orig; btn.style.background=''; btn.style.color=''; }, 2000);
-  }).catch(function(){
-    alert(text);
-  });
 }
 
-function typeTags(o){
-  var t = '<span class="tag '+(o.type==='自取'?'t-pickup':'t-delivery')+'">'+(o.type==='自取'?'🏪 自取':'🚛 宅配')+'</span>';
-  if(o.payStatus==='已收款') t+=' <span class="tag t-paid">已收款</span>';
-  else if(o.payStatus==='待匯款') t+=' <span class="tag t-unpaid">待匯款</span>';
-  else if(o.type==='自取') t+=' <span class="tag t-cash">現場收款</span>';
-  if(o.custType==='批發') t+=' <span class="tag t-wholesale">📦 批發</span>';
-  return t;
-}
-
-// ── 統計分頁
-function renderStats(){
-  var orderCount = orders.length;
-  var totalBoxes = orders.reduce(function(s,o){return s+o.qty;},0);
-
-  var shipped = orders.filter(function(o){return o.shippedAt;});
-  var unshipped = orders.filter(function(o){return !o.shippedAt;});
-  var shippedBoxes = shipped.reduce(function(s,o){return s+o.qty;},0);
-  var unshippedBoxes = unshipped.reduce(function(s,o){return s+o.qty;},0);
-  var shipPct = totalBoxes>0 ? Math.round(shippedBoxes/totalBoxes*100) : 0;
-
-  var paid = orders.filter(function(o){return o.paidAt;});
-  var unpaid = orders.filter(function(o){return !o.paidAt;});
-  var paidAmount = paid.reduce(function(s,o){return s+(o.totalAmount||o.amount||0);},0);
-  var unpaidAmount = unpaid.reduce(function(s,o){return s+(o.totalAmount||o.amount||0);},0);
-  var totalAmount = paidAmount+unpaidAmount;
-  var paidPct = totalAmount>0 ? Math.round(paidAmount/totalAmount*100) : 0;
-
-  var pu = orders.filter(function(o){return o.type==='自取';});
-  var de = orders.filter(function(o){return o.type==='宅配';});
-  var puBoxes = pu.reduce(function(s,o){return s+o.qty;},0);
-  var deBoxes = de.reduce(function(s,o){return s+o.qty;},0);
-  var typeTotal = puBoxes+deBoxes;
-  var puPct = typeTotal>0 ? Math.round(puBoxes/typeTotal*100) : 0;
-  var dePct = typeTotal>0 ? 100-puPct : 0;
-
-  document.getElementById('st-order-count').textContent = orderCount;
-  document.getElementById('st-total-boxes').textContent = totalBoxes;
-
-  document.getElementById('st-shipped-boxes').textContent = shippedBoxes+' 盒（'+shipped.length+'筆）';
-  document.getElementById('st-unshipped-boxes').textContent = unshippedBoxes+' 盒（'+unshipped.length+'筆）';
-  document.getElementById('st-ship-fill').style.width = shipPct+'%';
-  document.getElementById('st-ship-sub').textContent = '已出貨佔 '+shipPct+'%';
-
-  document.getElementById('st-paid-amount').textContent = 'NT$'+paidAmount.toLocaleString();
-  document.getElementById('st-unpaid-amount').textContent = 'NT$'+unpaidAmount.toLocaleString();
-  document.getElementById('st-paid-fill').style.width = paidPct+'%';
-  document.getElementById('st-paid-sub').textContent = '已收款佔總額 '+paidPct+'%（'+paid.length+'/'+orderCount+' 筆）';
-
-  document.getElementById('st-pickup').textContent = pu.length+' 筆 / '+puBoxes+' 盒';
-  document.getElementById('st-delivery').textContent = de.length+' 筆 / '+deBoxes+' 盒';
-  document.getElementById('st-pickup-fill').style.width = puPct+'%';
-  document.getElementById('st-delivery-fill').style.width = dePct+'%';
-
-  document.getElementById('st-stock-total').textContent = totalStock+' 盒';
-  document.getElementById('st-stock-sold').textContent = soldStock+' 盒';
-  document.getElementById('st-stock-remain').textContent = remainStock+' 盒';
-  var stockPct = totalStock>0 ? Math.round(soldStock/totalStock*100) : 0;
-  document.getElementById('st-stock-fill').style.width = stockPct+'%';
-}
-
-function printAll(){
-  var unshipped = orders.filter(function(o){ return !o.shippedAt; });
-  if(!unshipped.length){ alert('目前沒有未出貨訂單！'); return; }
-
-  // 依預計出貨日排序（無日期排最後）
-  unshipped.sort(function(a,b){
-    if(!a.shipDate && !b.shipDate) return 0;
-    if(!a.shipDate) return 1;
-    if(!b.shipDate) return -1;
-    return a.shipDate.localeCompare(b.shipDate);
-  });
-
-  var now = new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei'});
-  var total = unshipped.reduce(function(s,o){return s+o.qty;},0);
-  var puTotal = unshipped.filter(function(o){return o.type==='自取';}).reduce(function(s,o){return s+o.qty;},0);
-  var deTotal = unshipped.filter(function(o){return o.type==='宅配';}).reduce(function(s,o){return s+o.qty;},0);
-
-  // 依日期分組
-  var groups = {};
-  var noDate = [];
-  unshipped.forEach(function(o){
-    if(!o.shipDate){ noDate.push(o); return; }
-    if(!groups[o.shipDate]) groups[o.shipDate] = [];
-    groups[o.shipDate].push(o);
-  });
-
-  function pickupRows(list){
-    return list.map(function(o){
-      return '<tr>'+
-        '<td class="chk">☐</td>'+
-        '<td><b>'+o.name+'</b></td>'+
-        '<td><b>'+(o.name||'同左')+'</b></td>'+
-        '<td><span class="n2">'+(o.phone||'—')+'</span></td>'+
-        '<td style="text-align:center;font-weight:700">'+o.qty+'</td>'+
-        '<td>'+(o.payStatus||'現場收款')+'</td>'+
-        '<td>'+(o.note||'')+'</td>'+
-        '<td class="chk">☐</td>'+
-        '</tr>';
-    }).join('');
-  }
-
-  function deliveryRows(list){
-    return list.map(function(o){
-      return '<tr>'+
-        '<td class="chk">☐</td>'+
-        '<td><b>'+o.name+'</b></td>'+
-        '<td><b>'+(o.name||'同左')+'</b></td>'+
-        '<td><span class="n2">'+(o.phone||'—')+'</span></td>'+
-        '<td style="text-align:center;font-weight:700">'+o.qty+'</td>'+
-        '<td>'+(o.payStatus||'待匯款')+'</td>'+
-        '<td style="font-size:13px">'+(o.address||'')+'</td>'+
-        '<td>'+(o.note||'')+'</td>'+
-        '<td class="chk">☐</td>'+
-        '</tr>';
-    }).join('');
-  }
-
-  function section(list, label){
-    var pu = list.filter(function(o){return o.type==='自取';});
-    var de = list.filter(function(o){return o.type==='宅配';});
-    var puB = pu.reduce(function(s,o){return s+o.qty;},0);
-    var deB = de.reduce(function(s,o){return s+o.qty;},0);
-    var html = '<div class="ps-day">'+label+'　共 '+(puB+deB)+' 盒（自取 '+puB+' ／宅配 '+deB+'）</div>';
-    if(pu.length){
-      html += '<div class="ps-type">🏪 自取（'+puB+' 盒）</div>';
-      html += '<table>'+
-        '<tr><th class="chk">出</th><th style="width:12%">訂購人</th><th style="width:12%">收件人</th><th style="width:11%">電話</th><th style="width:5%;text-align:center">盒</th><th style="width:10%">收款</th><th>備註</th><th class="chk">收</th></tr>'+
-        pickupRows(pu)+'</table>';
+function loadOrders() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) return parsed;
     }
-    if(de.length){
-      html += '<div class="ps-type" style="margin-top:8px">🚛 宅配（'+deB+' 盒）</div>';
-      html += '<table>'+
-        '<tr><th class="chk">出</th><th style="width:10%">訂購人</th><th style="width:10%">收件人</th><th style="width:10%">電話</th><th style="width:4%;text-align:center">盒</th><th style="width:8%">收款</th><th style="width:22%">地址</th><th>備註</th><th class="chk">收</th></tr>'+
-        deliveryRows(de)+'</table>';
-    }
-    return html;
+  } catch (error) {
+    console.warn("讀取測試資料失敗", error);
   }
-
-  var body = '';
-  // 依日期排序的群組
-  Object.keys(groups).sort().forEach(function(ds){
-    var d = new Date(ds+'T00:00:00');
-    var wd2 = ['日','一','二','三','四','五','六'][d.getDay()];
-    var lbl = (d.getMonth()+1)+'/'+d.getDate()+'（'+wd2+'）';
-    body += section(groups[ds], '📅 '+lbl);
-  });
-  // 未安排
-  if(noDate.length){
-    body += section(noDate, '⚠️ 尚未安排出貨日');
-  }
-
-  document.getElementById('print-sheet').innerHTML =
-    '<h2>🍊 砂糖橘未出貨清單</h2>'+
-    '<div class="ps-meta">列印時間：'+now+'　共 '+unshipped.length+' 筆　'+total+' 盒（自取'+puTotal+'／宅配'+deTotal+'）</div>'+
-    body;
-
-  window.print();
+  return demoData();
 }
 
-loadOrders();
+let orders = loadOrders();
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+    return true;
+  } catch (error) {
+    alert("無法儲存測試資料，請檢查瀏覽器儲存空間。");
+    return false;
+  }
+}
+
+function deliveryTotal(d) {
+  return d.qty * PRICE + d.shipping;
+}
+
+function allDeliveries() {
+  return orders.flatMap(order =>
+    order.deliveries.map(d => ({ ...d, order }))
+  );
+}
+
+function renderSummary() {
+  const ds = allDeliveries();
+  $("orderCount").textContent = orders.length;
+  $("boxCount").textContent =
+    ds.reduce((sum, d) => sum + d.qty, 0);
+  $("unpaidCount").textContent =
+    ds.filter(d => !d.paid).length;
+  $("pendingCount").textContent =
+    ds.filter(d => !d.shipped).length;
+}
+
+function orderCard(order) {
+  const boxes = order.deliveries.reduce(
+    (sum, d) => sum + d.qty, 0
+  );
+  const total = order.deliveries.reduce(
+    (sum, d) => sum + deliveryTotal(d), 0
+  );
+
+  return `
+    <div class="card">
+      <h3>${escapeHTML(order.buyer)}</h3>
+      <div class="muted">
+        ${escapeHTML(order.id)} ·
+        ${escapeHTML(order.phone)}
+      </div>
+      <p>
+        ${boxes} 盒 ·
+        <strong>${money(total)}</strong>
+      </p>
+      ${order.deliveries.map(d => `
+        <div class="delivery">
+          <div class="row">
+            <strong>
+              ${escapeHTML(d.type)} · ${d.qty} 盒
+            </strong>
+            <span class="pill">
+              ${d.shipped ? "已出貨" : "未出貨"}
+            </span>
+          </div>
+          <p>
+            ${escapeHTML(d.name)}<br>
+            ${escapeHTML(d.phone)}<br>
+            ${escapeHTML(d.address)}
+          </p>
+          <p class="muted">
+            商品 ${money(d.qty * PRICE)} ／
+            運費 ${money(d.shipping)}
+          </p>
+          <span class="pill">
+            ${d.paid ? "已收款" : "待收款"}
+          </span>
+          ${d.shipDate ? `
+            <span class="pill">
+              出貨日 ${escapeHTML(d.shipDate)}
+            </span>
+          ` : ""}
+        </div>
+      `).join("")}
+      ${order.note ? `
+        <p class="muted">
+          備註：${escapeHTML(order.note)}
+        </p>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderOrders() {
+  const q = $("search").value.trim().toLowerCase();
+
+  const filtered = orders.filter(order =>
+    [
+      order.id,
+      order.buyer,
+      order.phone,
+      ...order.deliveries.flatMap(d => [
+        d.name, d.phone, d.address
+      ])
+    ].some(value =>
+      String(value || "").toLowerCase().includes(q)
+    )
+  );
+
+  $("orderList").innerHTML =
+    filtered.map(orderCard).join("") ||
+    '<div class="card">沒有符合的訂單。</div>';
+}
+
+function findDelivery(id) {
+  for (const order of orders) {
+    const delivery = order.deliveries.find(d => d.id === id);
+    if (delivery) return delivery;
+  }
+  return null;
+}
+
+function updatePayment(id) {
+  const d = findDelivery(id);
+  if (!d) return;
+
+  if (d.paid && d.shipped && d.type === "宅配") {
+    alert("宅配已出貨，請先核對後再調整收款。");
+    return;
+  }
+
+  const question = d.paid
+    ? "確定取消這筆收款確認？"
+    : "確定已收到這筆配送的全額款項？";
+
+  if (!confirm(question)) return;
+
+  d.paid = !d.paid;
+  if (save()) renderAll();
+}
+
+function renderPayments() {
+  const ds = allDeliveries();
+
+  $("paymentList").innerHTML = ds.map(d => `
+    <div class="card">
+      <h3>${escapeHTML(d.name)}</h3>
+      <p class="muted">
+        ${escapeHTML(d.order.id)} ·
+        ${escapeHTML(d.type)} · ${d.qty} 盒
+      </p>
+      <p>
+        應收金額：
+        <strong>${money(deliveryTotal(d))}</strong>
+      </p>
+      <p>
+        <span class="pill">
+          ${d.paid ? "已收款" : "待收款"}
+        </span>
+      </p>
+      <button
+        class="${d.paid ? "secondary" : "primary"}"
+        data-payment="${escapeHTML(d.id)}">
+        ${d.paid ? "取消收款確認" : "確認全額收款"}
+      </button>
+    </div>
+  `).join("");
+}
+
+function updateShipDate(id, date) {
+  const d = findDelivery(id);
+  if (!d || d.shipped) return;
+
+  d.shipDate = date;
+  if (save()) renderAll();
+}
+
+function updateShipping(id) {
+  const d = findDelivery(id);
+  if (!d) return;
+
+  if (!d.shipped) {
+    if (!d.shipDate) {
+      alert("請先安排出貨日期。");
+      return;
+    }
+    if (d.type === "宅配" && !d.paid) {
+      alert("宅配尚未收款，不能標記已出貨。");
+      return;
+    }
+  }
+
+  if (!confirm(d.shipped
+    ? "確定取消已出貨標記？"
+    : "確定這筆配送已經出貨？")) return;
+
+  d.shipped = !d.shipped;
+  if (save()) renderAll();
+}
+
+function renderShipping() {
+  const ds = allDeliveries();
+
+  $("shippingList").innerHTML = ds.map(d => `
+    <div class="card">
+      <h3>${escapeHTML(d.name)} · ${d.qty} 盒</h3>
+      <p class="muted">
+        ${escapeHTML(d.order.id)} ·
+        ${escapeHTML(d.type)}
+      </p>
+      <p>
+        ${escapeHTML(d.phone)}<br>
+        ${escapeHTML(d.address)}
+      </p>
+      <p>
+        <span class="pill">
+          ${d.paid ? "已收款" : "待收款"}
+        </span>
+        <span class="pill">
+          ${d.shipped ? "已出貨" : "待出貨"}
+        </span>
+      </p>
+      <div class="no-print">
+        <label>預計出貨／自取日期</label>
+        <input
+          type="date"
+          value="${escapeHTML(d.shipDate)}"
+          data-shipdate="${escapeHTML(d.id)}"
+          ${d.shipped ? "disabled" : ""}>
+        <p></p>
+        <button
+          class="${d.shipped ? "secondary" : "primary"}"
+          data-shipped="${escapeHTML(d.id)}">
+          ${d.shipped ? "取消出貨標記" : "確認已出貨"}
+        </button>
+      </div>
+    </div>
+  `).join("");
+}
+
+let deliveryCounter = 0;
+
+function addDelivery() {
+  deliveryCounter++;
+  const id = deliveryCounter;
+  const div = document.createElement("div");
+  div.className = "delivery delivery-form";
+
+  div.innerHTML = `
+    <div class="row">
+      <h3>配送資料 ${id}</h3>
+      <button class="danger remove-delivery">移除</button>
+    </div>
+
+    <label>配送方式</label>
+    <select class="type">
+      <option value="宅配">宅配</option>
+      <option value="自取">自取</option>
+    </select>
+
+    <label>收件人姓名</label>
+    <input class="name">
+
+    <label>收件人電話</label>
+    <input class="phone" type="tel">
+
+    <label>宅配地址</label>
+    <input class="address">
+
+    <label>盒數</label>
+    <input class="qty" type="number" min="1" value="1">
+
+    <label>配送備註</label>
+    <input class="note">
+
+    <p class="muted freight"></p>
+  `;
+
+  div.querySelector(".remove-delivery").onclick = () => {
+    div.remove();
+    estimate();
+  };
+
+  div.querySelectorAll("input, select").forEach(el => {
+    el.addEventListener("input", estimate);
+    el.addEventListener("change", estimate);
+  });
+
+  $("deliveryForms").appendChild(div);
+  estimate();
+}
+
+function collectDeliveries() {
+  return [...document.querySelectorAll(".delivery-form")]
+    .map((form, index) => ({
+      id: "D-" + Date.now() + "-" + index,
+      type: form.querySelector(".type").value,
+      name: form.querySelector(".name").value.trim(),
+      phone: form.querySelector(".phone").value.trim(),
+      address: form.querySelector(".address").value.trim(),
+      qty: Number(form.querySelector(".qty").value),
+      note: form.querySelector(".note").value.trim()
+    }));
+}
+
+function calculateDelivery(d) {
+  const pieces = d.type === "宅配"
+    ? Math.ceil(d.qty / BOXES_PER_PIECE)
+    : 0;
+
+  return {
+    ...d,
+    address: d.type === "宅配" ? d.address : "",
+    shipping: pieces * SHIPPING_FEE,
+    paid: false,
+    shipped: false,
+    shipDate: ""
+  };
+}
+
+function estimate() {
+  const lines = collectDeliveries();
+  let total = 0;
+
+  const forms = document.querySelectorAll(".delivery-form");
+
+  lines.forEach((line, i) => {
+    const qty = Number.isInteger(line.qty) && line.qty > 0
+      ? line.qty : 0;
+    const pieces = line.type === "宅配"
+      ? Math.ceil(qty / BOXES_PER_PIECE)
+      : 0;
+    const shipping = pieces * SHIPPING_FEE;
+
+    total += qty * PRICE + shipping;
+
+    forms[i].querySelector(".freight").textContent =
+      `${pieces} 件貨運 · 運費 ${money(shipping)}`;
+  });
+
+  $("estimate").textContent = money(total);
+}
+
+function createOrder() {
+  const buyer = $("buyerName").value.trim();
+  const phone = $("buyerPhone").value.trim();
+  const lines = collectDeliveries();
+
+  if (!buyer || !phone) {
+    alert("請填寫訂購人姓名與電話。");
+    return;
+  }
+
+  if (!lines.length) {
+    alert("請至少新增一筆配送資料。");
+    return;
+  }
+
+  for (const [i, d] of lines.entries()) {
+    if (
+      !d.name ||
+      !d.phone ||
+      !Number.isInteger(d.qty) ||
+      d.qty < 1 ||
+      (d.type === "宅配" && !d.address)
+    ) {
+      alert(`第 ${i + 1} 筆配送資料不完整。`);
+      return;
+    }
+  }
+
+  if (!confirm("確定建立這筆測試訂單？")) return;
+
+  const order = {
+    id: makeId(),
+    buyer,
+    phone,
+    note: $("orderNote").value.trim(),
+    deliveries: lines.map(calculateDelivery)
+  };
+
+  orders.unshift(order);
+
+  if (!save()) {
+    orders.shift();
+    return;
+  }
+
+  $("buyerName").value = "";
+  $("buyerPhone").value = "";
+  $("orderNote").value = "";
+  $("deliveryForms").innerHTML = "";
+  addDelivery();
+
+  renderAll();
+  switchPage("orders");
+
+  alert("測試訂單建立成功：" + order.id);
+}
+
+function renderAll() {
+  renderSummary();
+  renderOrders();
+  renderPayments();
+  renderShipping();
+}
+
+function switchPage(page) {
+  ["orders", "payments", "shipping", "create"].forEach(id => {
+    $(id).classList.toggle("hide", id !== page);
+  });
+
+  document.querySelectorAll("nav button").forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.page === page
+    );
+  });
+}
+
+document.querySelectorAll("nav button").forEach(button => {
+  button.addEventListener("click", () => {
+    switchPage(button.dataset.page);
+  });
+});
+
+$("search").addEventListener("input", renderOrders);
+
+$("paymentList").addEventListener("click", event => {
+  const button = event.target.closest("[data-payment]");
+  if (button) updatePayment(button.dataset.payment);
+});
+
+$("shippingList").addEventListener("change", event => {
+  if (event.target.matches("[data-shipdate]")) {
+    updateShipDate(
+      event.target.dataset.shipdate,
+      event.target.value
+    );
+  }
+});
+
+$("shippingList").addEventListener("click", event => {
+  const button = event.target.closest("[data-shipped]");
+  if (button) updateShipping(button.dataset.shipped);
+});
+
+addDelivery();
+renderAll();
 </script>
 </body>
 </html>

@@ -1,10 +1,10 @@
 // ── 砂糖橘系統設定
-const LINE_TOKEN = '2pgUy78YYeH/bf+gL4MyCWxiQYA2XtFUPzWwIigkRj3/JBHy5Ee6Z92uOBkTYgo9kZYp5mBCfLybgd9VVLLb7hTPqb9VE2Q2d1lYMVPV3euPtDKYEuinsN0LcuxXCtpm9MIS9dLqvVphxhCTETYZmAdB04t89/1O/w1cDnyilFU=';
+const LINE_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 const SPREADSHEET_ID = '1o-qz74NpmMshMbFG3O9oCMPRQs8G2Rmr1HEBecUyvXo'; // 砂糖橘專用試算表
 const PICKUP_ADDRESS = '苗栗縣公館鄉館東村和東街46號（每日 09:00–17:00）';
 
 // ── Telegram 設定（與水蜜桃共用）
-const TELEGRAM_TOKEN = '8667366687:AAE8B2mgPmiFUVo1VfOSoCJ5EjGwayaI7J0';
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = '7588402543';       // 管理員（你）
 const TELEGRAM_CHAT_ID_2 = '8991514370';    // 小幫手巧玲
 

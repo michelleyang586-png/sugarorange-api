@@ -35,7 +35,7 @@ async function accessToken(){
   const d=await r.json();if(!r.ok||!d.access_token)throw new Error('Google 授權失敗');return d.access_token;
 }
 async function sheets(token,path,method='GET',body){
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/${path}`,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}${path.startsWith(':') || path.startsWith('?') ? '' : '/'}${path}`,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
   const d=await r.json();if(!r.ok)throw new Error(`Google Sheets ${r.status}: ${JSON.stringify(d).slice(0,250)}`);return d;
 }
 const range = (s) => `values/${encodeURIComponent(s)}`;

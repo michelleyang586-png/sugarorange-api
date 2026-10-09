@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
@@ -224,7 +224,7 @@
 
       <div id="delivery-info-section" class="info-box delivery-info" style="display:none;">
         🚛 <b>新竹貨運宅配說明：</b><br>
-        📦 運費以 4 盒為一單位，NT$ 180 / 件<br>
+        📦 運費以 4 盒為一單位，NT$ 150 / 件<br>
         💳 請完成匯款後告知，<b style="color:#4A90D9;">依匯款順序出貨</b><br>
         🕐 出貨後約 1–2 個工作天到貨<br>
         📞 聯絡電話：羅小姐 0972-211755<br>
@@ -272,6 +272,8 @@
   var deliveryType = '自取';
   var lineName = '';
   var lineUserId = '';
+  var lineAccessToken = '';
+  var sending = false;
 
   function syncUI(idx) {
     var el = document.getElementById('qty-' + idx);
@@ -308,6 +310,7 @@
           var profile = await liff.getProfile();
           lineName   = profile.displayName;
           lineUserId = profile.userId;
+          lineAccessToken = liff.getAccessToken() || '';
         } else {
           liff.login();
           return;
@@ -320,10 +323,6 @@
   }
 
   function setDelivery(type) {
-    for (var j = 0; j < SPECS.length; j++) {
-      qtys[j] = 0;
-      syncUI(j);
-    }
     deliveryType = type;
     document.getElementById('btn-pickup').className   = 'delivery-btn' + (type === '自取' ? ' active' : '');
     document.getElementById('btn-delivery').className = 'delivery-btn' + (type === '宅配' ? ' active' : '');
@@ -337,7 +336,7 @@
     if (deliveryType !== '宅配') return 0;
     var totalBoxes = qtys.reduce(function(a, b) { return a + b; }, 0);
     if (totalBoxes === 0) return 0;
-    return Math.ceil(totalBoxes / 4) * 180;
+    return Math.ceil(totalBoxes / 4) * 150;
   }
 
   function updatePriceDisplay() {
@@ -358,7 +357,15 @@
     document.getElementById('price-display').innerHTML = html;
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
   function showSuccessScreen(orderId, name, specSummary, totalAmount, shipping, address, note) {
+    orderId = escapeHtml(orderId); name = escapeHtml(name);
+    specSummary = escapeHtml(specSummary); address = escapeHtml(address); note = escapeHtml(note);
     document.getElementById('main-screen').style.display = 'none';
     var screen = document.getElementById('success-screen');
     screen.style.display = 'block';
@@ -384,6 +391,7 @@
   }
 
   async function submitOrder() {
+    if (sending) return;
     var name    = document.getElementById('name').value.trim();
     var phone   = document.getElementById('phone').value.trim();
     var address = document.getElementById('address').value.trim();
@@ -428,35 +436,53 @@
     btn.disabled = true;
     btn.textContent = '訂單處理中...';
 
+    sending = true;
     try {
-      var params = new URLSearchParams({
-        action: 'order',
-        lineName: lineName || name,
-        recipientName: name,
-        lineUserId: lineUserId || '',
-        phone: phone,
-        deliveryType: deliveryType,
-        spec0: String(qtys[0]),
-        specSummary: specSummary,
-        amount: String(totalAmount),
-        address: address || '自取（' + PICKUP_ADDRESS + '）',
-        note: note || ''
-      });
-      var res    = await fetch(API_URL + '?' + params.toString());
-      var result = await res.json();
-      if (result.status === 'success') {
-        showSuccessScreen(result.orderId, name, specSummary, totalAmount, shipping, address, note);
-      } else {
-        throw new Error('API returned non-success status');
+      if (!lineAccessToken && typeof liff !== 'undefined') {
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+        lineAccessToken = liff.getAccessToken() || '';
       }
+      if (!lineAccessToken) throw new Error('請透過 LINE 開啟訂購頁面並完成登入');
+      var payload = {
+        action: 'createOrder',
+        buyerName: name,
+        buyerPhone: phone,
+        note: note,
+        deliveries: [{
+          type: deliveryType,
+          name: name,
+          phone: phone,
+          address: deliveryType === '宅配' ? address : '',
+          qty: totalBoxes,
+          note: note
+        }]
+      };
+      var res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + lineAccessToken
+        },
+        body: JSON.stringify(payload)
+      });
+      var result = await res.json();
+      if (!res.ok || result.status !== 'success') {
+        throw new Error(result.message || '訂單送出失敗');
+      }
+      showSuccessScreen(result.orderId, name, specSummary, result.total, result.shipping, address, note);
     } catch (e) {
       console.error('Submit error:', e);
       var msg = e.message && e.message.includes('Failed to fetch')
         ? '網路連線失敗，請確認網路後再試'
-        : '送出失敗，請稍後再試';
+        : (e.message || '送出失敗，請稍後再試');
       alert(msg);
       btn.disabled = false;
       btn.textContent = '確認送出訂單';
+    } finally {
+      sending = false;
     }
   }
 

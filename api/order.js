@@ -162,7 +162,7 @@ async function createOrder(t,payload,source,user){
   catch(e){throw httpError(`訂單 ${rows.oid} 寫入結果不明，請先人工核對，不要重複送單：${e.message}`,503);}
   return {orderId:rows.oid,boxes:calc.boxes,goods:calc.goods,shipping:calc.shipping,total:calc.total};
 }
-module.exports={calculate,buildRows,settings,manageDelivery,handler:async function handler(req,res){
+module.exports = async function handler(req, res) {
   header(res);if(req.method==='OPTIONS')return res.status(204).end();
   try{
     const action=req.method==='GET'?req.query?.action:req.body?.action;
@@ -186,4 +186,4 @@ module.exports={calculate,buildRows,settings,manageDelivery,handler:async functi
     }
     return send(res,404,{status:'error',message:'此版本尚未提供該功能'});
   }catch(e){return send(res,e.status||((/不正確|不完整|不可空白|需有/.test(e.message))?400:500),{status:'error',message:e.message});}
-}};
+};

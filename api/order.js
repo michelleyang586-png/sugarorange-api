@@ -1,366 +1,189 @@
-// ── 砂糖橘系統設定
-const LINE_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-const SPREADSHEET_ID = '1o-qz74NpmMshMbFG3O9oCMPRQs8G2Rmr1HEBecUyvXo'; // 砂糖橘專用試算表
-const PICKUP_ADDRESS = '苗栗縣公館鄉館東村和東街46號（每日 09:00–17:00）';
 
-// ── Telegram 設定（與水蜜桃共用）
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = '7588402543';       // 管理員（你）
-const TELEGRAM_CHAT_ID_2 = '8991514370';    // 小幫手巧玲
-
-// ── 砂糖橘商品規格（只有一種，之後可增加）
-const specs = [
-  { key: 'spec0', name: '砂糖橘 5斤裝', unit: 1, price: 400 }
-];
-
-// ── 運費計算（每4盒一單位 $180）
-function calcShipping(totalBoxes) {
-  if (totalBoxes === 0) return 0;
-  return Math.ceil(totalBoxes / 4) * 180;
-}
-
-async function getAccessToken() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const rawKey = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
-  const { createSign } = await import('crypto');
-  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
-  const now = Math.floor(Date.now() / 1000);
-  const claim = Buffer.from(JSON.stringify({
-    iss: email,
-    scope: 'https://www.googleapis.com/auth/spreadsheets',
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now
-  })).toString('base64url');
-  const sign = createSign('RSA-SHA256');
-  sign.update(`${header}.${claim}`);
-  const signature = sign.sign(rawKey, 'base64url');
-  const jwt = `${header}.${claim}.${signature}`;
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=' + jwt
+/** 餘有榮焉 v2 — 簡易版後端待整合稿。請先完成前端相容性與測試，勿直接部署。 */
+const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || '1ZQrN--Rp703JXXXfBJECKE5L_z2Td2ZvompWXVD7K5c';
+const ORIGIN = process.env.ALLOWED_ORIGIN || 'https://michelleyang586-png.github.io';
+const DEFAULTS = Object.freeze({ price:400, boxesPerPiece:4, shippingPerPiece:150, pickupShipping:0 });
+const TABS = Object.freeze({orders:'訂單總表',details:'配送明細',payments:'收款紀錄',settings:'系統設定'});
+const header = (res) => {res.setHeader('Access-Control-Allow-Origin',ORIGIN);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');res.setHeader('Cache-Control','no-store');};
+const send = (res,code,obj) => res.status(code).json(obj);
+const safeStr = (v,max=150) => typeof v==='string' ? v.trim().slice(0,max) : '';
+const positiveInt = v => Number.isSafeInteger(Number(v)) && Number(v)>0 && Number(v)<=10000 ? Number(v) : null;
+const numeric = v => Number.isFinite(Number(v)) && Number(v)>=0 ? Number(v) : null;
+const nowTW = () => new Date().toLocaleString('sv-SE',{timeZone:'Asia/Taipei'}).replace(' ','T');
+function calculate(lines,settings=DEFAULTS){
+  if(!Array.isArray(lines)||lines.length<1||lines.length>30) throw new Error('配送明細需有 1 至 30 筆');
+  const normalized = lines.map((line,i)=>{
+    const type=safeStr(line.type,8), qty=positiveInt(line.qty);
+    if(!['自取','宅配'].includes(type)||!qty) throw new Error(`第 ${i+1} 筆配送方式或盒數不正確`);
+    const name=safeStr(line.name,60),phone=safeStr(line.phone,30),address=safeStr(line.address,200);
+    if(!name||!phone||(type==='宅配'&&!address)) throw new Error(`第 ${i+1} 筆收件資訊不完整`);
+    const pieces=type==='宅配'?Math.ceil(qty/settings.boxesPerPiece):0;
+    const shipping=type==='宅配'?pieces*settings.shippingPerPiece:settings.pickupShipping;
+    return {type,qty,name,phone,address:type==='宅配'?address:'',pieces,shipping,goods:qty*settings.price,note:safeStr(line.note,300),requestedDate:safeStr(line.requestedDate,20),requestedTime:safeStr(line.requestedTime,40)};
   });
-  const data = await res.json();
-  if (!data.access_token) throw new Error('取得 token 失敗：' + JSON.stringify(data));
-  return data.access_token;
+  const boxes=normalized.reduce((s,x)=>s+x.qty,0), goods=normalized.reduce((s,x)=>s+x.goods,0), shipping=normalized.reduce((s,x)=>s+x.shipping,0);
+  return {lines:normalized,boxes,goods,shipping,total:goods+shipping};
 }
-
-async function readRange(token, range) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}`;
-  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-  const data = await res.json();
-  return data.values || [];
+async function accessToken(){
+  const email=process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,key=process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g,'\n');
+  if(!email||!key) throw new Error('缺少 Google 服務帳號環境變數');
+  const {createSign}=require('node:crypto'), t=Math.floor(Date.now()/1000);
+  const a=Buffer.from(JSON.stringify({alg:'RS256',typ:'JWT'})).toString('base64url');
+  const b=Buffer.from(JSON.stringify({iss:email,scope:'https://www.googleapis.com/auth/spreadsheets',aud:'https://oauth2.googleapis.com/token',iat:t,exp:t+3600})).toString('base64url');
+  const s=createSign('RSA-SHA256');s.update(`${a}.${b}`);
+  const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion:`${a}.${b}.${s.sign(key,'base64url')}`})});
+  const d=await r.json();if(!r.ok||!d.access_token)throw new Error('Google 授權失敗');return d.access_token;
 }
-
-async function writeRange(token, range, values) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
-  await fetch(url, {
-    method: 'PUT',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values })
-  });
+async function sheets(token,path,method='GET',body){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/${path}`,{method,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+  const d=await r.json();if(!r.ok)throw new Error(`Google Sheets ${r.status}: ${JSON.stringify(d).slice(0,250)}`);return d;
 }
-
-async function appendRow(token, range, values) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&includeValuesInResponse=true`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values })
-  });
-  return await res.json();
+const range = (s) => `values/${encodeURIComponent(s)}`;
+const read = async (t,s) => (await sheets(t,range(s))).values||[];
+async function append(t,tab,rows){return sheets(t,`${range(`${tab}!A:Z`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,'POST',{values:rows});}
+async function settings(t){
+  const rows=await read(t,`${TABS.settings}!A1:B20`),map=Object.fromEntries(rows.slice(1).map(r=>[r[0],r[1]]));
+  const price=positiveInt(map['砂糖橘每盒售價']),boxesPerPiece=positiveInt(map['每件最多盒數']);
+  const shippingPerPiece=numeric(map['每件宅配運費']),pickupShipping=numeric(map['自取運費']);
+  if(!price||!boxesPerPiece||shippingPerPiece===null||pickupShipping===null) throw new Error('系統設定內容不完整，請檢查 A1:B5');
+  return {price,boxesPerPiece,shippingPerPiece,pickupShipping};
 }
-
-async function colorRows(token, sheetId, startRow, endRow, color) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`;
-  await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      requests: [{
-        repeatCell: {
-          range: { sheetId, startRowIndex: startRow, endRowIndex: endRow },
-          cell: { userEnteredFormat: { backgroundColor: color } },
-          fields: 'userEnteredFormat.backgroundColor'
-        }
-      }]
-    })
-  });
+// 管理動作依「配送編號」定位，不依試算表列號，避免排序後誤改他人訂單。
+const sheetCol=(n)=>{let x=n+1,s='';while(x){x--;s=String.fromCharCode(65+x%26)+s;x=Math.floor(x/26)}return s};
+async function updateCells(t,updates){
+  if(!updates.length)return;
+  return sheets(t,'values:batchUpdate','POST',{valueInputOption:'RAW',data:updates.map(x=>({range:`'${x.tab}'!${sheetCol(x.col)}${x.row}`,values:[[x.value]]}))});
 }
-
-// ── 訂單編號：TS（自取）/ TD（宅配）+ 日期 + 流水號
-async function generateOrderId(token, deliveryType) {
-  const now = new Date();
-  const yy = String(now.getFullYear()).slice(2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const dateStr = yy + mm + dd;
-  const prefix = deliveryType === '宅配' ? 'TD' : 'TS';
-  const todayPrefix = prefix + dateStr;
-  const rows = await readRange(token, '訂單總表!A:A');
-  let maxSeq = 0;
-  for (const r of rows) {
-    if (!r[0] || !r[0].startsWith(todayPrefix)) continue;
-    const parts = r[0].split('-');
-    const seq = parseInt(parts[1], 10);
-    if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+const httpError=(message,status=400)=>Object.assign(new Error(message),{status});
+const isoDate=(v)=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v+'T00:00:00Z'));
+async function manageDelivery(t,body){
+  const detailId=safeStr(body.detailId,80),operation=body.action;
+  if(!detailId)throw httpError('缺少配送編號');
+  const [details,payments,orders]=await Promise.all([read(t,'配送明細!A2:S'),read(t,'收款紀錄!A2:L'),read(t,'訂單總表!A2:S')]);
+  const i=details.findIndex(r=>r[0]===detailId);
+  if(i<0)throw httpError('找不到此配送明細',404);
+  const d=details[i],row=i+2,orderId=d[1],payIndex=payments.findIndex(r=>r[2]===detailId);
+  const ts=nowTW(),changes=[];
+  const change=(tab,r,c,v)=>changes.push({tab,row:r,col:c,value:v});
+  let result={detailId,orderId};
+  if(operation==='setShipDate'){
+    if(d[13]==='已出貨')throw httpError('已出貨的配送明細不可修改日期');
+    const date=safeStr(body.shipDate,10);
+    if(date&&!isoDate(date))throw httpError('出貨日期格式錯誤');
+    change(TABS.details,row,11,date);change(TABS.details,row,13,date?'待出貨':'待安排');
+    change(TABS.details,row,18,ts);result.shipDate=date;
+  }else if(operation==='markPaid'){
+    if(payIndex<0)throw httpError('找不到此配送的收款紀錄，請先人工核對');
+    const p=payments[payIndex],pr=payIndex+2,due=Number(p[4]),oldPaid=Number(p[6]||0);
+    if(!Number.isFinite(due)||due<0||!Number.isFinite(oldPaid))throw httpError('收款金額資料不正確');
+    const paid=body.paid===true?due:body.paid===false?0:null;
+    if(paid===null)throw httpError('收款狀態必須指定 true 或 false');
+    if(body.paid===false&&d[13]==='已出貨'&&d[4]==='宅配')throw httpError('宅配已出貨，不可直接取消收款，請先核對');
+    change(TABS.payments,pr,6,paid);change(TABS.payments,pr,7,paid===due?'已收款':'待收款');
+    change(TABS.payments,pr,9,paid===due?ts:'');change(TABS.payments,pr,11,ts);
+    result.paid=paid;result.due=due;
+  }else if(operation==='markShipped'){
+    if(typeof body.shipped!=='boolean')throw httpError('出貨狀態必須指定 true 或 false');
+    if(body.shipped){
+      if(!d[11])throw httpError('請先安排出貨日期');
+      if(d[4]==='宅配'){
+        if(payIndex<0)throw httpError('宅配缺少收款紀錄，禁止出貨');
+        const p=payments[payIndex];
+        if(Number(p[6]||0)<Number(p[4]||0))throw httpError('宅配尚未全額收款，禁止標記出貨');
+      }
+    }
+    change(TABS.details,row,12,body.shipped?ts.slice(0,10):'');
+    change(TABS.details,row,13,body.shipped?'已出貨':d[11]?'待出貨':'待安排');
+    change(TABS.details,row,18,ts);result.shipped=body.shipped;
+  }else throw httpError('不支援的管理操作',404);
+  // 先更新目標資料，成功後再同步訂單總表的摘要欄位。
+  await updateCells(t,changes);
+  const oi=orders.findIndex(r=>r[0]===orderId);
+  if(oi>=0){
+    const orderRow=oi+2;
+    const all=details.filter(r=>r[1]===orderId);
+    if(operation==='markShipped')d[13]=body.shipped?'已出貨':d[11]?'待出貨':'待安排';
+    if(operation==='setShipDate'){d[11]=result.shipDate;d[13]=result.shipDate?'待出貨':'待安排'}
+    if(operation==='markPaid')payments[payIndex][6]=result.paid;
+    const related=payments.filter(r=>r[1]===orderId);
+    const due=related.reduce((s,r)=>s+Number(r[4]||0),0),paid=related.reduce((s,r)=>s+Number(r[6]||0),0);
+    const payStatus=paid>=due?'已收款':paid>0?'部分收款':'待收款';
+    const shipStatus=all.every(r=>r[13]==='已出貨')?'已完成':all.some(r=>r[13]==='已出貨')?'部分出貨':all.every(r=>r[11])?'已安排':'待安排';
+    try{await updateCells(t,[{tab:TABS.orders,row:orderRow,col:12,value:payStatus},{tab:TABS.orders,row:orderRow,col:15,value:shipStatus},{tab:TABS.orders,row:orderRow,col:18,value:ts}]);}
+    catch(e){throw httpError('配送/收款明細已更新，但訂單總表摘要同步失敗，請重新整理並人工核對：'+e.message,503)}
   }
-  const seq = String(maxSeq + 1).padStart(3, '0');
-  return `${todayPrefix}-${seq}`;
+  return result;
 }
-
-async function sendTelegram(message) {
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message })
-  });
-  // 測試期間暫停小幫手通知，開賣前取消註解
-  // await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID_2, text: message })
-  // });
+// LINE access token 必須由 LINE 官方 verify API 驗證，絕不相信前端自行傳來的 userId。
+async function verifiedLineUser(req){
+  const token=(req.headers.authorization||'').match(/^Bearer (.+)$/i)?.[1];
+  if(!token)throw Object.assign(new Error('需要 LINE 登入'),{status:401});
+  const channel=process.env.LINE_LOGIN_CHANNEL_ID||'2009767596';
+  const vr=await fetch('https://api.line.me/oauth2/v2.1/verify?access_token='+encodeURIComponent(token));
+  if(!vr.ok)throw httpError('LINE 登入已失效',401);
+  const v=await vr.json();
+  if(String(v.client_id)!==String(channel))throw httpError('LINE 登入來源不正確',401);
+  const r=await fetch('https://api.line.me/v2/profile',{headers:{Authorization:`Bearer ${token}`}});
+  if(!r.ok)throw httpError('LINE 無法取得使用者資訊',401);
+  const p=await r.json();if(!p.userId)throw httpError('LINE 驗證失敗',401);return p;
 }
-
-async function sendLineToCustomer(userId, message) {
-  if (!userId || !LINE_TOKEN || LINE_TOKEN === 'YOUR_LINE_TOKEN_HERE') return;
-  await fetch('https://api.line.me/v2/bot/message/push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + LINE_TOKEN },
-    body: JSON.stringify({ to: userId, messages: [{ type: 'text', text: message }] })
-  });
+async function requireAdmin(req){
+  const p=await verifiedLineUser(req);
+  const allowed=(process.env.ADMIN_LINE_USER_IDS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(!allowed.includes(p.userId))throw Object.assign(new Error('此 LINE 帳號未獲授權'),{status:403});
+  return p;
 }
-
-const ORDER_COLORS = [
-  { red: 1,    green: 0.88, blue: 0.75 },
-  { red: 0.82, green: 0.95, blue: 0.82 },
-  { red: 0.82, green: 0.9,  blue: 1    },
-  { red: 1,    green: 0.85, blue: 0.85 },
-  { red: 0.9,  green: 0.85, blue: 1    }
-];
-
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  try {
-    const token = await getAccessToken();
-    const action = req.query.action;
-
-    // ── 庫存讀取
-    const stockRow = await readRange(token, '庫存控制!A2:D2');
-    const totalStock  = Number(stockRow[0]?.[0]) || 0;
-    const soldStock   = Number(stockRow[0]?.[1]) || 0;
-    const remainStock = Number(stockRow[0]?.[2]) || 0;
-    const stockLimit  = Number(stockRow[0]?.[3]) || 0; // D2：今日採收上限
-
-    if (action === 'debug') {
-      return res.json({ totalStock, soldStock, remainStock });
-    }
-
-    if (action === 'order') {
-      const { lineName, recipientName, phone, deliveryType, amount, address, note } = req.query;
-      const actualName = recipientName || lineName;
-      const amt = parseInt(amount) || 0;
-      const timestamp = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-      const orderId = await generateOrderId(token, deliveryType);
-
-      let totalBoxes = 0;
-      let specSummary = [];
-      let orderItems = [];
-
-      for (const item of specs) {
-        const qty = parseInt(req.query[item.key]) || 0;
-        if (qty <= 0) continue;
-        totalBoxes += qty;
-        specSummary.push(`${item.name} x ${qty}`);
-        orderItems.push({ item, qty, itemAmount: qty * item.price });
-      }
-
-      const shipping = deliveryType === '宅配' ? calcShipping(totalBoxes) : 0;
-
-      if (totalBoxes > remainStock) {
-        return res.status(400).json({ status: 'error', message: '庫存不足' });
-      }
-
-      const rows = await readRange(token, '訂單總表!A:A');
-      const uniqueOrders = [...new Set(rows.slice(1).map(r => r[0]).filter(Boolean))];
-      const color = ORDER_COLORS[uniqueOrders.length % ORDER_COLORS.length];
-
-      // 欄位對應（A~Q）：
-      // A 訂單編號 | B 時間戳記 | C LINE名稱 | D 收件人 | E 電話
-      // F 規格 | G 取貨方式 | H 數量 | I 金額 | J 收件地址
-      // K 備註 | L 付款狀態 | M 出貨狀態 | N 後五碼(手填)
-      // O 預計出貨日(後台排) | P 🟠出貨日期(後台自動) | Q 🟢收款日期(後台自動)
-      let firstRowIndex = null;
-      for (const row of orderItems) {
-        const result = await appendRow(token, '訂單總表!A:S', [[
-          orderId, timestamp, lineName, actualName, "'"+phone,
-          row.item.name, deliveryType, row.qty, row.itemAmount,
-          address || '自取', note || '',
-          deliveryType === '宅配' ? '待匯款' : '取貨付款',
-          '待出貨', '', 'NT$'+amt, '', '', '', '零售'
-          // A訂單編號 B時間 C LINE D收件人 E電話 F規格 G取貨方式
-          // H數量 I商品金額 J地址 K備註 L付款狀態 M出貨狀態 N後五碼
-          // O總金額(含運費) P預計出貨日 Q🟠出貨日期 R🟢收款日期 S客戶類型
-        ]]);
-        if (firstRowIndex === null) {
-          const match = result.updates.updatedRange.match(/A(\d+):/);
-          if (match) firstRowIndex = Number(match[1]) - 1;
-        }
-      }
-
-      await colorRows(token, 0, firstRowIndex, firstRowIndex + orderItems.length, color);
-
-      const newSold   = soldStock + totalBoxes;
-      const newRemain = totalStock - newSold;
-      await writeRange(token, '庫存控制!B2:C2', [[newSold, newRemain]]);
-
-      const productAmount = amt - shipping;
-      const emoji = deliveryType === '宅配' ? '🚛' : '🏪';
-      const noteText = (note || '').trim() ? '\n📝 備註：' + note : '';
-      const specLines = specSummary.join('\n');
-
-      // ── 管理員通知（Telegram）
-      const adminMsg =
-        '🍊 新砂糖橘訂單！\n' +
-        '訂單編號：' + orderId + '\n' +
-        'LINE帳號：' + lineName + '\n' +
-        '收件人：' + actualName + '\n' +
-        '電話：' + phone + '\n' +
-        '取貨方式：' + emoji + ' ' + deliveryType + '\n' +
-        '數量：' + totalBoxes + ' 盒\n' +
-        '商品金額：NT$ ' + productAmount + '\n' +
-        (deliveryType === '宅配' ? '運費：NT$ ' + shipping + '\n' : '') +
-        '總金額：NT$ ' + amt + '\n' +
-        (deliveryType === '宅配' ? '地址：' + address + '\n' : '') +
-        (note ? '備註：' + note + '\n' : '') +
-        '付款：' + (deliveryType === '宅配' ? '⏳ 等待匯款' : '取貨付款');
-
-      // ── 顧客通知（LINE）
-      let customerMsg;
-      if (deliveryType === '自取') {
-        customerMsg =
-          '🍊【餘有榮焉 訂單確認】\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '📋 訂單編號：' + orderId + '\n' +
-          '👤 訂購人：' + actualName + '\n' +
-          '📞 電話：' + phone + '\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '🛍️ 訂購內容：\n' + specLines + '\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '🏪 取貨方式：現場自取\n' +
-          '📍 自取地點：' + PICKUP_ADDRESS + '\n' +
-          '💰 應付金額：NT$ ' + amt + '（取貨付款）\n' +
-          '💡 如需提前轉帳，請私訊我們索取匯款資訊' +
-          noteText + '\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '感謝訂購！如有問題請直接回覆訊息 🙏';
-      } else {
-        customerMsg =
-          '🚛【餘有榮焉 訂單確認】\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '📋 訂單編號：' + orderId + '\n' +
-          '👤 訂購人：' + actualName + '\n' +
-          '📞 電話：' + phone + '\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '🛍️ 訂購內容：\n' + specLines + '\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '🚛 取貨方式：新竹貨運宅配\n' +
-          '📦 收件地址：' + address + '\n' +
-          '💴 商品金額：NT$ ' + productAmount + '\n' +
-          '🚛 運費：NT$ ' + shipping + '\n' +
-          '💰 應付總金額：NT$ ' + amt +
-          noteText + '\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '🏦【匯款資訊】\n' +
-          '銀行：中國信託（822）\n' +
-          '帳號：901 5611 35830\n' +
-          '戶名：楊敏\n' +
-          '⚠️ 請於訂購後 48 小時內完成匯款\n' +
-          '✅ 匯款後請回覆此訊息告知後五碼，將依匯款順序出貨\n' +
-          '━━━━━━━━━━━━━━━\n' +
-          '感謝訂購！如有問題請直接回覆訊息 🙏';
-      }
-
-      await sendTelegram(adminMsg);
-      // await sendLineToCustomer(req.query.lineUserId || '', customerMsg); // 測試期間暫停LINE推播
-
-      return res.json({ status: 'success', orderId, totalBoxes, remainStock: newRemain });
-    }
-
-    // ── 後台：讀取所有訂單
-    if (action === 'getOrders') {
-      const rows = await readRange(token, '訂單總表!A:S');
-      if (rows.length < 2) return res.json({ status: 'success', orders: [] });
-      const orders = rows.slice(1).map((r, i) => ({
-        rowIndex: i + 2,
-        orderId:    r[0]  || '',
-        timestamp:  r[1]  || '',
-        lineName:   r[2]  || '',
-        name:       r[3]  || '',
-        phone:      r[4]  || '',
-        spec:       r[5]  || '',
-        type:       r[6]  || '',
-        qty:        Number(r[7]) || 0,
-        amount:     Number(r[8]) || 0,  // I欄：商品金額
-        address:    r[9]  || '',
-        note:       r[10] || '',
-        payStatus:  r[11] || '',
-        shipStatus: r[12] || '',
-        last5:      r[13] || '',
-        totalAmount: Number(r[14]) || 0, // O欄：總金額含運費
-        shipDate:   r[15] || '',         // P欄：預計出貨日
-        shippedAt:  r[16] || '',         // Q欄：出貨日期
-        paidAt:     r[17] || '',         // R欄：收款日期
-        custType:   r[18] || '零售',      // S欄：客戶類型（零售／批發）
-      }));
-      return res.json({ status: 'success', orders, stockLimit, totalStock, soldStock, remainStock });
-    }
-
-    // ── 後台：設定今日採收上限（寫入 D2）
-    if (action === 'setStockLimit') {
-      const { limit } = req.query;
-      await writeRange(token, '庫存控制!D2', [[Number(limit) || 0]]);
-      return res.json({ status: 'success', stockLimit: Number(limit) || 0 });
-    }
-
-    // ── 後台：安排出貨日（寫入 O 欄）
-    if (action === 'setShipDate') {
-      const { rowIndex, shipDate } = req.query;
-      await writeRange(token, `訂單總表!P${rowIndex}`, [[shipDate]]);
-      return res.json({ status: 'success' });
-    }
-
-    // ── 後台：勾出貨（寫入 P 欄 + 更新 M 欄）
-    if (action === 'markShipped') {
-      const { rowIndex, undo } = req.query;
-      const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-      const shippedAt = undo === '1' ? '' : now;
-      const shipStatus = undo === '1' ? '待出貨' : '已出貨';
-      await writeRange(token, `訂單總表!M${rowIndex}`, [[shipStatus]]);
-      await writeRange(token, `訂單總表!Q${rowIndex}`, [[shippedAt]]);
-      return res.json({ status: 'success', shippedAt });
-    }
-
-    // ── 後台：勾收款（寫入 Q 欄 + 更新 L 欄）
-    if (action === 'markPaid') {
-      const { rowIndex, undo, deliveryType } = req.query;
-      const now = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-      const paidAt = undo === '1' ? '' : now;
-      const payStatus = undo === '1' ? (deliveryType === '宅配' ? '待匯款' : '取貨付款') : '已收款';
-      await writeRange(token, `訂單總表!L${rowIndex}`, [[payStatus]]);
-      await writeRange(token, `訂單總表!R${rowIndex}`, [[paidAt]]);
-      return res.json({ status: 'success', paidAt });
-    }
-
-    return res.json({ totalStock, soldStock, remainStock, specs });
-
-  } catch (err) {
-    return res.status(500).json({ status: 'error', message: err.message });
+function id(prefix){return `${prefix}${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${require('node:crypto').randomBytes(5).toString('hex').toUpperCase()}`;}
+function buildRows(payload,calc,source,lineUser){
+  const ts=nowTW(),oid=id('SO'),buyer=safeStr(payload.buyerName,60),phone=safeStr(payload.buyerPhone,30);
+  if(!buyer||!phone)throw new Error('訂購人姓名與電話不可空白');
+  const order=[oid,ts,source,lineUser?.displayName||'',lineUser?.userId||'',buyer,phone,calc.boxes,calc.goods,calc.shipping,calc.total,'分項收款','待收款','', '', '待安排',safeStr(payload.note,500),'',ts];
+  const details=[],payments=[];
+  for(const line of calc.lines){
+    const did=id('DL'),payid=id('PY'),due=line.goods+line.shipping;
+    details.push([did,oid,line.name,line.phone,line.type,line.address,'砂糖橘 5台斤／盒',line.qty,line.pieces,line.type==='宅配'?line.pieces?line.shipping/line.pieces:0:0,line.shipping,'','','待安排','',line.requestedDate,line.requestedTime,line.note,ts]);
+    payments.push([payid,oid,did,line.type==='宅配'?'宅配預付':'自取貨款',due,line.type==='宅配'?'銀行轉帳':'現場付款或銀行轉帳',0,'待收款','','','',ts]);
   }
+  return {oid,order,details,payments};
 }
+// 注意：Sheets 跨分頁寫入不是交易；出錯時回傳「待人工核對」，避免誤報完成。
+async function createOrder(t,payload,source,user){
+  const config=await settings(t),calc=calculate(payload.deliveries,config);
+  const rows=buildRows(payload,calc,source,user);
+  // 一次提交三張表的新增列，避免分開呼叫造成部分寫入。
+  // appendCells 的 sheetId 由工作表 metadata 查得，不依賴分頁順序。
+  const meta=await sheets(t,'?fields=sheets(properties(sheetId,title))');
+  const ids=Object.fromEntries((meta.sheets||[]).map(s=>[s.properties.title,s.properties.sheetId]));
+  const requests=[[TABS.orders,[rows.order]],[TABS.details,rows.details],[TABS.payments,rows.payments]].map(([tab,values])=>{
+    if(ids[tab]===undefined)throw httpError(`找不到工作表：${tab}`,500);
+    return {appendCells:{sheetId:ids[tab],rows:values.map(row=>({values:row.map(value=>({userEnteredValue:typeof value==='number'?{numberValue:value}:{stringValue:String(value??'')}}))})),fields:'userEnteredValue'}};
+  });
+  try{await sheets(t,':batchUpdate','POST',{requests});}
+  catch(e){throw httpError(`訂單 ${rows.oid} 寫入結果不明，請先人工核對，不要重複送單：${e.message}`,503);}
+  return {orderId:rows.oid,boxes:calc.boxes,goods:calc.goods,shipping:calc.shipping,total:calc.total};
+}
+module.exports={calculate,buildRows,settings,manageDelivery,handler:async function handler(req,res){
+  header(res);if(req.method==='OPTIONS')return res.status(204).end();
+  try{
+    const action=req.method==='GET'?req.query?.action:req.body?.action;
+    if(req.method==='GET'&&action==='settings'){const t=await accessToken();return send(res,200,{status:'success',settings:await settings(t)});}
+    if(req.method==='POST'&&action==='createOrder'){
+      // 客戶端必須提供有效 LINE token；管理員電話訂單需同時通過管理員授權。
+      const user=await verifiedLineUser(req),source=req.body?.source==='管理員電話訂單'?'管理員電話訂單':'LINE';
+      if(source==='管理員電話訂單')await requireAdmin(req);
+      const t=await accessToken(),result=await createOrder(t,req.body,source,user);
+      return send(res,201,{status:'success',...result});
+    }
+    if(req.method==='GET'&&action==='getOrders'){
+      await requireAdmin(req);const t=await accessToken();
+      const [orders,details,payments]=await Promise.all([read(t,'訂單總表!A2:S'),read(t,'配送明細!A2:S'),read(t,'收款紀錄!A2:L')]);
+      return send(res,200,{status:'success',orders,details,payments,settings:await settings(t)});
+    }
+    if(req.method==='POST'&&['setShipDate','markPaid','markShipped'].includes(action)){
+      await requireAdmin(req);const t=await accessToken();
+      const result=await manageDelivery(t,req.body||{});
+      return send(res,200,{status:'success',...result});
+    }
+    return send(res,404,{status:'error',message:'此版本尚未提供該功能'});
+  }catch(e){return send(res,e.status||((/不正確|不完整|不可空白|需有/.test(e.message))?400:500),{status:'error',message:e.message});}
+}};

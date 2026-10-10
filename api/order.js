@@ -145,8 +145,7 @@ function id(prefix){return `${prefix}${new Date().toISOString().slice(0,10).repl
 function buildRows(payload,calc,source,lineUser){
   const ts=nowTW(),oid=id('SO'),buyer=safeStr(payload.buyerName,60),phone=safeStr(payload.buyerPhone,30);
   if(!buyer||!phone)throw new Error('訂購人姓名與電話不可空白');
-  const order=[oid,ts,source,lineUser?.displayName||'',lineUser?.userId||'',buyer,phone,calc.boxes,calc.goods,calc.shipping,calc.total,'分項收款','待收款','', '', '待安排',safeStr(payload.note,500),'',ts];
-  const details=[],payments=[];
+const order=[oid,ts,source,source==='LINE'?(lineUser?.displayName||''):'',source==='LINE'?(lineUser?.userId||''):'',buyer,phone,calc.boxes,calc.goods,calc.shipping,calc.total,'分項收款','待收款','','','待安排',safeStr(payload.note,500),'',ts,source==='後台手動輸入'?(lineUser?.userId||''):''];  const details=[],payments=[];
   for(const line of calc.lines){
     const did=id('DL'),payid=id('PY'),due=line.goods+line.shipping;
     details.push([did,oid,line.name,line.phone,line.type,line.address,'砂糖橘 5台斤／盒',line.qty,line.pieces,line.type==='宅配'?line.pieces?line.shipping/line.pieces:0:0,line.shipping,'','','待安排','',line.requestedDate,line.requestedTime,line.note,ts]);
@@ -185,6 +184,7 @@ let user = null;
 
 if (source === '後台手動輸入') {
   await requireAdmin(req);
+  user = await verifiedLineUser(req);
 } else {
   user = await verifiedLineUser(req);
 }

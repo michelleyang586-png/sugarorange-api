@@ -16,7 +16,7 @@ function calculate(lines,settings=DEFAULTS){
     const type=safeStr(line.type,8), qty=positiveInt(line.qty);
     if(!['自取','宅配'].includes(type)||!qty) throw new Error(`第 ${i+1} 筆配送方式或盒數不正確`);
     const name=safeStr(line.name,60),phone=safeStr(line.phone,30),address=safeStr(line.address,200);
-    if(!name||!phone||(type==='宅配'&&!address)) throw new Error(`第 ${i+1} 筆收件資訊不完整`);
+    if(type==='宅配'&&(!name||!phone||!address)) throw new Error(`第 ${i+1} 筆收件資訊不完整`);
     const pieces=type==='宅配'?Math.ceil(qty/settings.boxesPerPiece):0;
     const shipping=type==='宅配'?pieces*settings.shippingPerPiece:settings.pickupShipping;
     return {type,qty,name,phone,address:type==='宅配'?address:'',pieces,shipping,goods:qty*settings.price,note:safeStr(line.note,300),requestedDate:safeStr(line.requestedDate,20),requestedTime:safeStr(line.requestedTime,40)};

@@ -1,10 +1,10 @@
 
-/** 餘有榮焉 v2 — 簡易版後端待整合稿。請先完成前端相容性與測試，勿直接部署。 */
+/** 餘有榮焉訂單 API：與 admin.html 配套，部署前須完成整合測試。 */
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || '1ZQrN--Rp703JXXXfBJECKE5L_z2Td2ZvompWXVD7K5c';
 const ORIGIN = process.env.ALLOWED_ORIGIN || 'https://michelleyang586-png.github.io';
 const DEFAULTS = Object.freeze({ price:400, boxesPerPiece:4, shippingPerPiece:150, pickupShipping:0 });
 const TABS = Object.freeze({orders:'訂單總表',details:'配送明細',payments:'收款紀錄',settings:'系統設定'});
-const header = (res) => {res.setHeader('Access-Control-Allow-Origin',ORIGIN);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization, X-Admin-Password');res.setHeader('Cache-Control','no-store');};
+const header = (res) => {res.setHeader('Access-Control-Allow-Origin',ORIGIN);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization, X-Admin-Password, X-Admin-Session');res.setHeader('Cache-Control','no-store');};
 const send = (res,code,obj) => res.status(code).json(obj);
 const safeStr = (v,max=150) => typeof v==='string' ? v.trim().slice(0,max) : '';
 const positiveInt = v => Number.isSafeInteger(Number(v)) && Number(v)>0 && Number(v)<=10000 ? Number(v) : null;
@@ -59,7 +59,7 @@ const isoDate=(v)=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.i
 async function manageDelivery(t,body){
   const detailId=safeStr(body.detailId,80),operation=body.action;
   if(!detailId)throw httpError('缺少配送編號');
-  const [details,payments,orders]=await Promise.all([read(t,'配送明細!A2:S'),read(t,'收款紀錄!A2:L'),read(t,'訂單總表!A2:S')]);
+  const [details,payments,orders]=await Promise.all([read(t,'配送明細!A2:S'),read(t,'收款紀錄!A2:L'),read(t,'訂單總表!A2:U')]);
   const i=details.findIndex(r=>r[0]===detailId);
   if(i<0)throw httpError('找不到此配送明細',404);
   const d=details[i],row=i+2,orderId=d[1],payIndex=payments.findIndex(r=>r[2]===detailId);
@@ -128,6 +128,19 @@ async function verifiedLineUser(req){
   const p=await r.json();if(!p.userId)throw httpError('LINE 驗證失敗',401);return p;
 }
 async function requireAdmin(req) {
+  const sessionToken = req.headers['x-admin-session'];
+
+  if (typeof sessionToken === 'string' && sessionToken) {
+  const session = verifyAdminSession(sessionToken);
+  const user = await verifiedLineUser(req);
+
+  if (session.lineUserId !== user.userId) {
+    throw httpError('管理員 LINE 身分不符，請重新登入', 401);
+  }
+
+  return session;
+}
+
   const expected = process.env.ADMIN_PASSWORD;
   const supplied = req.headers['x-admin-password'];
 
@@ -135,17 +148,118 @@ async function requireAdmin(req) {
     throw httpError('尚未設定管理員密碼', 503);
   }
 
-  if (typeof supplied !== 'string' || supplied !== expected) {
-    throw httpError('管理員密碼不正確', 401);
+  if(typeof supplied!=='string'||supplied!==expected)
+  throw httpError('管理員密碼不正確',401);
+
+const user = await verifiedLineUser(req);
+
+return {
+  role: 'admin',
+  userId: user.userId,
+  displayName: user.displayName,
+  lineUserId: user.userId
+};
+}
+
+const crypto = require('node:crypto');
+
+const ADMIN_SESSION_SECONDS = 7 * 24 * 60 * 60;
+
+function createAdminSession(lineUserId) {
+  const expires = Math.floor(Date.now() / 1000) + ADMIN_SESSION_SECONDS;
+
+  const payload = Buffer.from(JSON.stringify({
+    uid: lineUserId,
+    exp: expires
+  })).toString('base64url');
+
+  const secret = process.env.ADMIN_SESSION_SECRET;
+
+  if (!secret) {
+    throw httpError('尚未設定管理員登入金鑰', 503);
   }
 
-  return { role: 'admin' };
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('base64url');
+
+  return {
+    token: `${payload}.${signature}`,
+    expires
+  };
+}
+
+function verifyAdminSession(token) {
+  const secret = process.env.ADMIN_SESSION_SECRET;
+
+  if (!secret || typeof token !== 'string') {
+    throw httpError('管理員登入已失效，請重新登入', 401);
+  }
+
+  const parts = token.split('.');
+
+  if (parts.length !== 2) {
+    throw httpError('管理員登入憑證無效', 401);
+  }
+
+  const [payload, signature] = parts;
+
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest();
+
+  let supplied;
+
+  try {
+    supplied = Buffer.from(signature, 'base64url');
+  } catch {
+    throw httpError('管理員登入憑證無效', 401);
+  }
+
+  if (
+    supplied.length !== expected.length ||
+    !crypto.timingSafeEqual(supplied, expected)
+  ) {
+    throw httpError('管理員登入憑證無效', 401);
+  }
+
+  let data;
+
+  try {
+    data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  } catch {
+    throw httpError('管理員登入憑證無效', 401);
+  }
+
+  if (
+    typeof data.uid !== 'string' ||
+    !data.uid ||
+    !Number.isSafeInteger(data.exp) ||
+    data.exp <= Math.floor(Date.now() / 1000)
+  ) {
+    throw httpError('管理員登入已過期，請重新登入', 401);
+  }
+
+  return { role: 'admin', lineUserId: data.uid };
 }
 function id(prefix){return `${prefix}${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${require('node:crypto').randomBytes(5).toString('hex').toUpperCase()}`;}
 function buildRows(payload,calc,source,lineUser){
   const ts=nowTW(),oid=id('SO'),buyer=safeStr(payload.buyerName,60),phone=safeStr(payload.buyerPhone,30);
   if(!buyer||!phone)throw new Error('訂購人姓名與電話不可空白');
-const order=[oid,ts,source,source==='LINE'?(lineUser?.displayName||''):'',source==='LINE'?(lineUser?.userId||''):'',buyer,phone,calc.boxes,calc.goods,calc.shipping,calc.total,'分項收款','待收款','','','待安排',safeStr(payload.note,500),'',ts,source==='後台手動輸入'?(lineUser?.userId||''):''];  const details=[],payments=[];
+const order = [
+  oid, ts, source,
+  source === 'LINE' ? (lineUser?.displayName || '') : '',
+  source === 'LINE' ? (lineUser?.userId || '') : '',
+  buyer, phone, calc.boxes, calc.goods, calc.shipping, calc.total,
+  '分項收款', '待收款', '', '', '待安排',
+  safeStr(payload.note, 500), '', ts,
+  source === '後台手動輸入' ? (lineUser?.userId || '') : '',
+  source === '後台手動輸入' ? (lineUser?.displayName || '') : ''
+];
+
+const details = [], payments = [];
   for(const line of calc.lines){
     const did=id('DL'),payid=id('PY'),due=line.goods+line.shipping;
     details.push([did,oid,line.name,line.phone,line.type,line.address,'砂糖橘 5台斤／盒',line.qty,line.pieces,line.type==='宅配'?line.pieces?line.shipping/line.pieces:0:0,line.shipping,'','','待安排','',line.requestedDate,line.requestedTime,line.note,ts]);
@@ -173,6 +287,18 @@ module.exports = async function handler(req, res) {
   header(res);if(req.method==='OPTIONS')return res.status(204).end();
   try{
     const action=req.method==='GET'?req.query?.action:req.body?.action;
+    if (req.method === 'POST' && action === 'adminLogin') {
+  const user = await requireAdmin(req);
+  const session = createAdminSession(user.userId);
+
+  return send(res, 200, {
+    status: 'success',
+    token: session.token,
+    expires: session.expires,
+    lineUserId: user.userId,
+    lineName: user.displayName
+  });
+}
     if(req.method==='GET'&&action==='settings'){const t=await accessToken();return send(res,200,{status:'success',settings:await settings(t)});}
     if(req.method==='POST'&&action==='createOrder'){
       // 客戶端必須提供有效 LINE token；管理員電話訂單需同時通過管理員授權。
@@ -193,7 +319,7 @@ if (source === '後台手動輸入') {
     }
     if(req.method==='GET'&&action==='getOrders'){
       await requireAdmin(req);const t=await accessToken();
-      const [orders,details,payments]=await Promise.all([read(t,'訂單總表!A2:S'),read(t,'配送明細!A2:S'),read(t,'收款紀錄!A2:L')]);
+      const [orders,details,payments]=await Promise.all([read(t,'訂單總表!A2:U'),read(t,'配送明細!A2:S'),read(t,'收款紀錄!A2:L')]);
       return send(res,200,{status:'success',orders,details,payments,settings:await settings(t)});
     }
     if(req.method==='POST'&&['setShipDate','markPaid','markShipped'].includes(action)){

@@ -177,13 +177,13 @@ module.exports = async function handler(req, res) {
     if(req.method==='GET'&&action==='settings'){const t=await accessToken();return send(res,200,{status:'success',settings:await settings(t)});}
     if(req.method==='POST'&&action==='createOrder'){
       // 客戶端必須提供有效 LINE token；管理員電話訂單需同時通過管理員授權。
-      const source = req.body?.source === '管理員電話訂單'
-  ? '管理員電話訂單'
+      const source = req.body?.source === '後台手動輸入'
+  ? '後台手動輸入'
   : 'LINE';
 
 let user = null;
 
-if (source === '管理員電話訂單') {
+if (source === '後台手動輸入') {
   await requireAdmin(req);
 } else {
   user = await verifiedLineUser(req);

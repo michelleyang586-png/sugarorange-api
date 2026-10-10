@@ -86,11 +86,8 @@ async function manageDelivery(t,body){
     if(typeof body.shipped!=='boolean')throw httpError('出貨狀態必須指定 true 或 false');
     if(body.shipped){
       if(!d[11])throw httpError('請先安排出貨日期');
-      if(d[4]==='宅配'){
-        if(payIndex<0)throw httpError('宅配缺少收款紀錄，禁止出貨');
-        const p=payments[payIndex];
-        if(Number(p[6]||0)<Number(p[4]||0))throw httpError('宅配尚未全額收款，禁止標記出貨');
-      }
+      // 宅配未收款可由管理員確認後出貨；收款狀態保持原樣，以利追蹤。
+      if(d[4]==='宅配' && payIndex<0)throw httpError('宅配缺少收款紀錄，請先核對');
     }
     change(TABS.details,row,12,body.shipped?ts.slice(0,10):'');
     change(TABS.details,row,13,body.shipped?'已出貨':d[11]?'待出貨':'待安排');

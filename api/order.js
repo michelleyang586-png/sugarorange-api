@@ -4,7 +4,7 @@ const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || '1ZQrN--Rp703JXXXfBJ
 const ORIGIN = process.env.ALLOWED_ORIGIN || 'https://michelleyang586-png.github.io';
 const DEFAULTS = Object.freeze({ price:400, boxesPerPiece:4, shippingPerPiece:150, pickupShipping:0 });
 const TABS = Object.freeze({orders:'訂單總表',details:'配送明細',payments:'收款紀錄',settings:'系統設定'});
-const header = (res) => {res.setHeader('Access-Control-Allow-Origin',ORIGIN);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');res.setHeader('Cache-Control','no-store');};
+const header = (res) => {res.setHeader('Access-Control-Allow-Origin',ORIGIN);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization, X-Admin-Password');res.setHeader('Cache-Control','no-store');};
 const send = (res,code,obj) => res.status(code).json(obj);
 const safeStr = (v,max=150) => typeof v==='string' ? v.trim().slice(0,max) : '';
 const positiveInt = v => Number.isSafeInteger(Number(v)) && Number(v)>0 && Number(v)<=10000 ? Number(v) : null;
@@ -127,11 +127,19 @@ async function verifiedLineUser(req){
   if(!r.ok)throw httpError('LINE 無法取得使用者資訊',401);
   const p=await r.json();if(!p.userId)throw httpError('LINE 驗證失敗',401);return p;
 }
-async function requireAdmin(req){
-  const p=await verifiedLineUser(req);
-  const allowed=(process.env.ADMIN_LINE_USER_IDS||'').split(',').map(x=>x.trim()).filter(Boolean);
-  if(!allowed.includes(p.userId))throw Object.assign(new Error('此 LINE 帳號未獲授權'),{status:403});
-  return p;
+async function requireAdmin(req) {
+  const expected = process.env.ADMIN_PASSWORD;
+  const supplied = req.headers['x-admin-password'];
+
+  if (!expected) {
+    throw httpError('尚未設定管理員密碼', 503);
+  }
+
+  if (typeof supplied !== 'string' || supplied !== expected) {
+    throw httpError('管理員密碼不正確', 401);
+  }
+
+  return { role: 'admin' };
 }
 function id(prefix){return `${prefix}${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${require('node:crypto').randomBytes(5).toString('hex').toUpperCase()}`;}
 function buildRows(payload,calc,source,lineUser){

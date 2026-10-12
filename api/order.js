@@ -242,8 +242,38 @@ function verifyAdminSession(token) {
   return { role: 'admin', lineUserId: data.uid };
 }
 function id(prefix){return `${prefix}${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${require('node:crypto').randomBytes(5).toString('hex').toUpperCase()}`;}
-function buildRows(payload,calc,source,lineUser){
-  const ts=nowTW(),oid=id('SO'),buyer=safeStr(payload.buyerName,60),phone=safeStr(payload.buyerPhone,30);
+// 雙編號採分階段啟用：未設定 ENABLE_DUAL_ORDER_IDS=true 時，完整沿用原有流程。
+// 啟用前必須完成 Apps Script 編號服務、URL 與整合測試。
+const dualIdsEnabled = () => process.env.ENABLE_DUAL_ORDER_IDS === 'true';
+async function allocateDualOrderIds() {
+  const url = process.env.ORDER_NUMBER_SERVICE_URL;
+  const secret = process.env.ORDER_API_SECRET;
+  if (!url || !secret || !/^https:\/\/script\.google\.com\//.test(url)) {
+    throw httpError('雙編號服務尚未正確設定，訂單未建立', 503);
+  }
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({action:'allocate', secret, year:'26'}),
+      signal: AbortSignal.timeout(20000)
+    });
+  } catch (error) {
+    throw httpError('編號服務暫時無法連線，訂單未建立；請稍後再試', 503);
+  }
+  let data;
+  try { data = await response.json(); }
+  catch { throw httpError('編號服務回應格式不正確，訂單未建立', 503); }
+  if (!response.ok || data.status !== 'success' ||
+      !/^SO-26\d{5}$/.test(data.internalOrderId || '') ||
+      !/^SO-26[A-HJ-NP-Z2-9]{5}$/.test(data.publicOrderId || '')) {
+    throw httpError('編號服務回傳異常，訂單未建立', 503);
+  }
+  return {internalOrderId:data.internalOrderId, publicOrderId:data.publicOrderId};
+}
+function buildRows(payload,calc,source,lineUser,assignedIds=null){
+  const ts=nowTW(),oid=assignedIds?.internalOrderId || id('SO'),buyer=safeStr(payload.buyerName,60),phone=safeStr(payload.buyerPhone,30);
   if(!buyer||!phone)throw new Error('訂購人姓名與電話不可空白');
 const order = [
   oid, ts, source,
@@ -253,7 +283,9 @@ const order = [
   '分項收款', '待收款', '', '', '待安排',
   safeStr(payload.note, 500), '', ts,
   source === '後台手動輸入' ? (lineUser?.userId || '') : '',
-  source === '後台手動輸入' ? (lineUser?.displayName || '') : ''
+  source === '後台手動輸入' ? (lineUser?.displayName || '') : '',
+  // V 欄：公開訂單編號；W 欄：抽獎資格（目前不自動判定）
+  ...(assignedIds ? [assignedIds.publicOrderId, ''] : [])
 ];
 
 const details = [], payments = [];
@@ -267,7 +299,8 @@ const details = [], payments = [];
 // 注意：Sheets 跨分頁寫入不是交易；出錯時回傳「待人工核對」，避免誤報完成。
 async function createOrder(t,payload,source,user){
   const config=await settings(t),calc=calculate(payload.deliveries,config);
-  const rows=buildRows(payload,calc,source,user);
+  const assignedIds=dualIdsEnabled()?await allocateDualOrderIds():null;
+  const rows=buildRows(payload,calc,source,user,assignedIds);
   // 一次提交三張表的新增列，避免分開呼叫造成部分寫入。
   // appendCells 的 sheetId 由工作表 metadata 查得，不依賴分頁順序。
   const meta=await sheets(t,'?fields=sheets(properties(sheetId,title))');
@@ -278,7 +311,9 @@ async function createOrder(t,payload,source,user){
   });
   try{await sheets(t,':batchUpdate','POST',{requests});}
   catch(e){throw httpError(`訂單 ${rows.oid} 寫入結果不明，請先人工核對，不要重複送單：${e.message}`,503);}
-  return {orderId:rows.oid,boxes:calc.boxes,goods:calc.goods,shipping:calc.shipping,total:calc.total};
+  return {orderId:assignedIds?.publicOrderId || rows.oid,
+    ...(assignedIds?{internalOrderId:rows.oid,publicOrderId:assignedIds.publicOrderId}:{}),
+    boxes:calc.boxes,goods:calc.goods,shipping:calc.shipping,total:calc.total};
 }
 module.exports = async function handler(req, res) {
   header(res);if(req.method==='OPTIONS')return res.status(204).end();

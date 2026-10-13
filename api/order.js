@@ -341,6 +341,70 @@ async function createOrder(t,payload,source,user){
     ...(assignedIds?{internalOrderId:rows.oid,publicOrderId:assignedIds.publicOrderId}:{}),
     boxes:calc.boxes,goods:calc.goods,shipping:calc.shipping,total:calc.total};
 }
+// 訂單通知：預設 OFF；TEST 僅允許測試帳號本人建立的 LINE 訂單；LIVE 開放所有 LINE 顧客。
+async function notifyLineOrder(user, result, deliveries) {
+  const mode = String(process.env.LINE_ORDER_NOTIFY_MODE || 'OFF').trim().toUpperCase();
+  if (mode === 'OFF') { console.info('[LINE_NOTIFY] skipped: OFF'); return; }
+  if (!['TEST', 'LIVE'].includes(mode)) { console.warn('[LINE_NOTIFY] skipped: invalid mode'); return; }
+
+  const userId = user?.userId;
+  const testUserId = String(process.env.LINE_ORDER_TEST_USER_ID || '').trim();
+  if (mode === 'TEST' && (!testUserId || userId !== testUserId)) {
+    console.info('[LINE_NOTIFY] skipped: not test user');
+    return;
+  }
+  if (!/^U[0-9a-f]{32}$/i.test(userId || '')) {
+    console.warn('[LINE_NOTIFY] skipped: invalid LINE user ID');
+    return;
+  }
+  const token = String(process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
+  if (!token) { console.error('[LINE_NOTIFY] failed: missing channel access token'); return; }
+
+  const lines = Array.isArray(deliveries) ? deliveries : [];
+  const types = [...new Set(lines.map(x => x?.type).filter(Boolean))];
+  const deliveryText = types.length === 1
+    ? (types[0] === '自取' ? '公館自取' : types[0] === '宅配' ? '新竹貨運宅配' : types[0])
+    : '自取及宅配（依訂單明細）';
+  const money = n => Number(n || 0).toLocaleString('en-US');
+  const message = [
+    '🍊【餘有榮焉｜預購登記成功】',
+    '感謝您的預購！💛',
+    '您的砂糖橘預購訂單已成功建立。',
+    '',
+    `📋 訂單編號｜${result.orderId}`,
+    '🍊 商品｜苗栗公館砂糖橘 5 台斤／盒',
+    `📦 訂購數量｜${result.boxes} 盒`,
+    `💰 訂單金額｜NT$ ${money(result.total)}`,
+    `🚚 取貨方式｜${deliveryText}`,
+    ...(Number(result.shipping) > 0 ? [`（含運費 NT$ ${money(result.shipping)}）`] : []),
+    '',
+    '💛 目前不需要付款',
+    '待果實成熟並確認供貨後，我們會另行通知付款及取貨／出貨安排。',
+    '',
+    '🎁 完成後續付款的有效訂單，即可獲得一次抽獎機會。',
+    '謝謝您支持餘有榮焉！',
+    '今天的陽光，成就今天的甜。'
+  ].join('\n');
+
+  try {
+    const response = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
+      body: JSON.stringify({to: userId, messages: [{type: 'text', text: message}]}),
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!response.ok) {
+      // 只記錄 HTTP 狀態與 LINE 回應，不記錄 token 或完整個資。
+      const errorText = (await response.text()).slice(0, 400);
+      console.error(`[LINE_NOTIFY] failed: HTTP ${response.status}; ${errorText}`);
+    } else {
+      console.info(`[LINE_NOTIFY] sent: mode=${mode}; orderId=${result.orderId}`);
+    }
+  } catch (error) {
+    console.error(`[LINE_NOTIFY] failed: ${error?.name || 'NetworkError'}: ${error?.message || 'unknown'}`);
+  }
+}
+
 module.exports = async function handler(req, res) {
   header(res);if(req.method==='OPTIONS')return res.status(204).end();
   try{
@@ -373,6 +437,11 @@ if (source === '後台手動輸入') {
   user = await verifiedLineUser(req);
 }
       const t=await accessToken(),result=await createOrder(t,req.body,source,user);
+      // 只有顧客透過 LINE 成功建立的訂單才發送；後台手動訂單不發送。
+      if (source === 'LINE') {
+        try { await notifyLineOrder(user, result, req.body?.deliveries); }
+        catch (error) { console.error('[LINE_NOTIFY] unexpected failure:', error?.message); }
+      }
       return send(res,201,{status:'success',...result});
     }
     if(req.method==='GET'&&action==='getOrders'){

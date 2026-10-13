@@ -241,7 +241,19 @@ function verifyAdminSession(token) {
 
   return { role: 'admin', lineUserId: data.uid };
 }
-function id(prefix){return `${prefix}${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${require('node:crypto').randomBytes(5).toString('hex').toUpperCase()}`;}
+function id(prefix){
+  if(prefix === 'SO'){
+    // 單一訂單編號：台灣日期 + 4 碼英數字（排除易混淆的 0/O、1/I）。
+    const date = nowTW().slice(0,10).replace(/-/g,'');
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const {randomInt} = require('node:crypto');
+    let suffix = '';
+    for(let i=0;i<4;i++) suffix += alphabet[randomInt(alphabet.length)];
+    return `SO${date}-${suffix}`;
+  }
+  // 配送與收款明細編號完全沿用舊版。
+  return `${prefix}${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${require('node:crypto').randomBytes(5).toString('hex').toUpperCase()}`;
+}
 // 雙編號採分階段啟用：未設定 ENABLE_DUAL_ORDER_IDS=true 時，完整沿用原有流程。
 // 啟用前必須完成 Apps Script 編號服務、URL 與整合測試。
 const dualIdsEnabled = () => process.env.ENABLE_DUAL_ORDER_IDS === 'true';
@@ -301,6 +313,20 @@ async function createOrder(t,payload,source,user){
   const config=await settings(t),calc=calculate(payload.deliveries,config);
   const assignedIds=dualIdsEnabled()?await allocateDualOrderIds():null;
   const rows=buildRows(payload,calc,source,user,assignedIds);
+  if(!assignedIds){
+    // 先比對訂單總表已存在的編號，碰撞時重新產生。
+    // 注意：Sheets 沒有唯一鍵，極少數同時送單仍可能競爭；正式上線前須測試。
+    const existing = new Set((await read(t,'訂單總表!A2:A')).map(r=>String(r[0]||'')));
+    let attempts = 0;
+    while(existing.has(rows.oid) && attempts < 30){
+      rows.oid = id('SO');
+      rows.order[0] = rows.oid;
+      for(const detail of rows.details) detail[1] = rows.oid;
+      for(const payment of rows.payments) payment[1] = rows.oid;
+      attempts++;
+    }
+    if(existing.has(rows.oid)) throw httpError('訂單編號暫時無法產生，請稍後再試',503);
+  }
   // 一次提交三張表的新增列，避免分開呼叫造成部分寫入。
   // appendCells 的 sheetId 由工作表 metadata 查得，不依賴分頁順序。
   const meta=await sheets(t,'?fields=sheets(properties(sheetId,title))');

@@ -342,7 +342,7 @@ async function createOrder(t,payload,source,user){
     boxes:calc.boxes,goods:calc.goods,shipping:calc.shipping,total:calc.total};
 }
 // 訂單通知：預設 OFF；TEST 僅允許測試帳號本人建立的 LINE 訂單；LIVE 開放所有 LINE 顧客。
-async function notifyLineOrder(user, result, deliveries) {
+async function notifyLineOrder(user, result, payload) {
   const mode = String(process.env.LINE_ORDER_NOTIFY_MODE || 'OFF').trim().toUpperCase();
   if (mode === 'OFF') { console.info('[LINE_NOTIFY] skipped: OFF'); return; }
   if (!['TEST', 'LIVE'].includes(mode)) { console.warn('[LINE_NOTIFY] skipped: invalid mode'); return; }
@@ -360,30 +360,59 @@ async function notifyLineOrder(user, result, deliveries) {
   const token = String(process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
   if (!token) { console.error('[LINE_NOTIFY] failed: missing channel access token'); return; }
 
-  const lines = Array.isArray(deliveries) ? deliveries : [];
-  const types = [...new Set(lines.map(x => x?.type).filter(Boolean))];
-  const deliveryText = types.length === 1
-    ? (types[0] === '自取' ? '公館自取' : types[0] === '宅配' ? '新竹貨運宅配' : types[0])
-    : '自取及宅配（依訂單明細）';
+  const lines = Array.isArray(payload?.deliveries) ? payload.deliveries : [];
+  const buyerName = safeStr(payload?.buyerName, 60) || '未提供';
+  const buyerPhone = safeStr(payload?.buyerPhone, 30) || '未提供';
   const money = n => Number(n || 0).toLocaleString('en-US');
+  const deliveryDetails = lines.flatMap((line, index) => {
+    const qty = Number(line?.qty || 0);
+    const isShipping = line?.type === '宅配';
+    const detail = [
+      `🚚 配送明細 ${index + 1}｜${isShipping ? '新竹貨運宅配' : '公館自取'}`,
+      `📦 數量｜${qty} 盒`
+    ];
+    if (isShipping) {
+      const receiver = safeStr(line?.name, 60) || buyerName;
+      const phone = safeStr(line?.phone, 30) || buyerPhone;
+      const address = safeStr(line?.address, 200) || '未提供';
+      const shipping = Math.ceil(qty / 4) * 150;
+      detail.push(
+        `👤 收件人｜${receiver}`,
+        `📞 收件電話｜${phone}`,
+        `📍 收件地址｜${address}`,
+        `🚚 運費｜NT$ ${money(shipping)}（實際依訂單金額為準）`
+      );
+    } else {
+      detail.push(
+        `👤 取貨聯絡人｜${buyerName}`,
+        `📞 聯絡電話｜${buyerPhone}`,
+        '📍 取貨地點｜苗栗縣公館鄉館東村和東街2鄰46號',
+        '📅 取貨時間｜另行通知預約'
+      );
+    }
+    return [...detail, ''];
+  });
   const message = [
-    '🍊【餘有榮焉｜預購登記成功】',
+    '🍊【餘有榮焉｜砂糖橘預購登記成功】',
     '感謝您的預購！💛',
     '您的砂糖橘預購訂單已成功建立。',
     '',
     `📋 訂單編號｜${result.orderId}`,
+    `👤 訂購人｜${buyerName}`,
+    `📞 訂購電話｜${buyerPhone}`,
     '🍊 商品｜苗栗公館砂糖橘 5 台斤／盒',
-    `📦 訂購數量｜${result.boxes} 盒`,
-    `💰 訂單金額｜NT$ ${money(result.total)}`,
-    `🚚 取貨方式｜${deliveryText}`,
-    ...(Number(result.shipping) > 0 ? [`（含運費 NT$ ${money(result.shipping)}）`] : []),
+    `📦 訂購總數｜${result.boxes} 盒`,
+    `💰 商品金額｜NT$ ${money(result.goods)}`,
+    `🚚 運費合計｜NT$ ${money(result.shipping)}`,
+    `💰 訂單總額｜NT$ ${money(result.total)}`,
     '',
+    ...deliveryDetails,
     '💛 目前不需要付款',
     '待果實成熟並確認供貨後，我們會另行通知付款及取貨／出貨安排。',
     '',
     '🎁 完成後續付款的有效訂單，即可獲得一次抽獎機會。',
     '謝謝您支持餘有榮焉！',
-    '今天的陽光，成就今天的甜。'
+    '有你｜有餘🧡'
   ].join('\n');
 
   try {
@@ -439,7 +468,7 @@ if (source === '後台手動輸入') {
       const t=await accessToken(),result=await createOrder(t,req.body,source,user);
       // 只有顧客透過 LINE 成功建立的訂單才發送；後台手動訂單不發送。
       if (source === 'LINE') {
-        try { await notifyLineOrder(user, result, req.body?.deliveries); }
+        try { await notifyLineOrder(user, result, req.body); }
         catch (error) { console.error('[LINE_NOTIFY] unexpected failure:', error?.message); }
       }
       return send(res,201,{status:'success',...result});

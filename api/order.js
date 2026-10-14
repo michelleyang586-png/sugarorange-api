@@ -364,27 +364,29 @@ async function notifyLineOrder(user, result, payload) {
   const buyerName = safeStr(payload?.buyerName, 60) || '未提供';
   const buyerPhone = safeStr(payload?.buyerPhone, 30) || '未提供';
   const money = n => Number(n || 0).toLocaleString('en-US');
+  const mapLink = address => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
+  const pickupAddress = '苗栗縣公館鄉館東村和東街2鄰46號';
   const deliveryDetails = lines.flatMap((line, index) => {
     const qty = Number(line?.qty || 0);
     const isShipping = line?.type === '宅配';
-    const detail = [
-      `🚚 配送明細 ${index + 1}｜${isShipping ? '新竹貨運宅配' : '公館自取'}`,
-      `📦 數量｜${qty} 盒`
-    ];
+    const multiple = lines.length > 1;
+    const detail = [];
+    if (multiple) detail.push(`📦 配送 ${index + 1}｜${isShipping ? '新竹貨運宅配' : '公館自取'}｜${qty} 盒`);
+    else detail.push(`🚚 取貨方式｜${isShipping ? '新竹貨運宅配' : '公館自取'}`);
     if (isShipping) {
       const receiver = safeStr(line?.name, 60) || buyerName;
       const phone = safeStr(line?.phone, 30) || buyerPhone;
       const address = safeStr(line?.address, 200) || '未提供';
-      const shipping = Math.ceil(qty / 4) * 150;
       detail.push(
         `👤 收件人｜${receiver}`,
         `📞 收件電話｜${phone}`,
-        `📍 收件地址｜${address}`,
-        `🚚 運費｜NT$ ${money(shipping)}（實際依訂單金額為準）`
+        `🏠 收件地址｜${address}`,
+        `📍 Google 地圖｜${mapLink(address)}`
       );
     } else {
       detail.push(
-        '📍 取貨地點｜苗栗縣公館鄉館東村和東街2鄰46號',
+        `🏡 取貨地址｜${pickupAddress}`,
+        `📍 Google 地圖｜${mapLink(pickupAddress)}`,
         '📅 取貨時間｜另行通知預約'
       );
     }
@@ -393,16 +395,14 @@ async function notifyLineOrder(user, result, payload) {
   const message = [
     '🍊【餘有榮焉｜砂糖橘預購登記成功】',
     '感謝您的預購！💛',
-    '您的砂糖橘預購訂單已成功建立。',
     '',
     `📋 訂單編號｜${result.orderId}`,
     `👤 訂購人｜${buyerName}`,
     `📞 訂購電話｜${buyerPhone}`,
-    '🍊 商品｜苗栗公館砂糖橘 5 台斤／盒',
-    `📦 訂購總數｜${result.boxes} 盒`,
+    `📦 訂購數量｜${result.boxes} 盒`,
     `💰 商品金額｜NT$ ${money(result.goods)}`,
     `🚚 運費合計｜NT$ ${money(result.shipping)}`,
-    `💰 訂單總額｜NT$ ${money(result.total)}`,
+    `💵 訂單總額｜NT$ ${money(result.total)}`,
     '',
     ...deliveryDetails,
     '💛 目前不需要付款',

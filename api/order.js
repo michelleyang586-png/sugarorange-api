@@ -364,7 +364,6 @@ async function notifyLineOrder(user, result, payload) {
   const buyerName = safeStr(payload?.buyerName, 60) || '未提供';
   const buyerPhone = safeStr(payload?.buyerPhone, 30) || '未提供';
   const money = n => Number(n || 0).toLocaleString('en-US');
-  const mapLink = address => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
   const pickupAddress = '苗栗縣公館鄉館東村和東街2鄰46號';
   const deliveryDetails = lines.flatMap((line, index) => {
     const qty = Number(line?.qty || 0);
@@ -380,8 +379,7 @@ async function notifyLineOrder(user, result, payload) {
       detail.push(
         `👤 收件人｜${receiver}`,
         `📞 收件電話｜${phone}`,
-        `🏠 收件地址｜${address}`,
-        `📍 Google 地圖｜${mapLink(address)}`
+        `🏠 收件地址｜${address}`
       );
     } else {
       detail.push(
@@ -397,6 +395,7 @@ async function notifyLineOrder(user, result, payload) {
     '感謝您的預購！💛',
     '',
     `📋 訂單編號｜${result.orderId}`,
+    ...(safeStr(user?.displayName, 100) ? [`💬 LINE 名稱｜${safeStr(user.displayName, 100)}`] : []),
     `👤 訂購人｜${buyerName}`,
     `📞 訂購電話｜${buyerPhone}`,
     `📦 訂購數量｜${result.boxes} 盒`,

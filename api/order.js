@@ -386,7 +386,7 @@ async function notifyLineOrder(user, result, payload) {
     } else {
       detail.push(
         `🏡 取貨地址｜${pickupAddress}`,
-        `📍 Google 地圖｜${mapLink(pickupAddress)}`,
+        '📍 取貨地點｜https://maps.app.goo.gl/pWkTmtfrxMaxY6MA8?g_st=ic',
         '📅 取貨時間｜另行通知預約'
       );
     }

@@ -384,8 +384,6 @@ async function notifyLineOrder(user, result, payload) {
       );
     } else {
       detail.push(
-        `👤 取貨聯絡人｜${buyerName}`,
-        `📞 聯絡電話｜${buyerPhone}`,
         '📍 取貨地點｜苗栗縣公館鄉館東村和東街2鄰46號',
         '📅 取貨時間｜另行通知預約'
       );

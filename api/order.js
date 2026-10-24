@@ -10,6 +10,21 @@ const safeStr = (v,max=150) => typeof v==='string' ? v.trim().slice(0,max) : '';
 const positiveInt = v => Number.isSafeInteger(Number(v)) && Number(v)>0 && Number(v)<=10000 ? Number(v) : null;
 const numeric = v => Number.isFinite(Number(v)) && Number(v)>=0 ? Number(v) : null;
 const nowTW = () => new Date().toLocaleString('sv-SE',{timeZone:'Asia/Taipei'}).replace(' ','T');
+// 本島宅配費率不適用離島；地址無法辨識時先聯繫客服，不以 0 元或本島費率建單。
+function validateMainlandAddress(address, index) {
+  const compact = address.normalize('NFKC').replace(/[\s\u3000-]/g, '').replace(/臺/g, '台');
+  const offshore = /澎湖|金門|連江|馬祖|小琉球|琉球鄉|綠島|蘭嶼|烏坵|烈嶼|東引|莒光|南竿|北竿|東沙|南沙/;
+  if (offshore.test(compact)) {
+    throw Object.assign(new Error(`第 ${index + 1} 筆為離島配送，無法套用台灣本島新竹貨運費率；請先聯繫我們確認運費及配送方式。`), {status:400});
+  }
+  // 接受常見國別及郵遞區號前綴；要求完整縣市，以免漏判只填鄉鎮的地址。
+  const local = compact.replace(/^(?:(?:中華民國|台灣省|台灣)|(?:\d{3,6})){0,3}/, '');
+  const mainland = /^(?:台北市|新北市|桃園市|台中市|台南市|高雄市|基隆市|新竹市|嘉義市|新竹縣|苗栗縣|彰化縣|南投縣|雲林縣|嘉義縣|屏東縣|宜蘭縣|花蓮縣|台東縣)/;
+  if (!mainland.test(local)) {
+    throw Object.assign(new Error(`第 ${index + 1} 筆宅配地址請填寫完整縣市、鄉鎮市區與地址；目前線上運費僅適用新竹貨運配送台灣本島，離島請先聯繫我們。`), {status:400});
+  }
+}
+const shippingNotice = (config) => `新竹貨運配送台灣本島，每 1～${config.boxesPerPiece} 盒運費 NT$${config.shippingPerPiece}，超過依件數計費；不同收件地址分別計算。離島配送請先聯繫我們。`;
 function calculate(lines,settings=DEFAULTS){
   if(!Array.isArray(lines)||lines.length<1||lines.length>30) throw new Error('配送明細需有 1 至 30 筆');
   const normalized = lines.map((line,i)=>{
@@ -17,6 +32,7 @@ function calculate(lines,settings=DEFAULTS){
     if(!['自取','宅配'].includes(type)||!qty) throw new Error(`第 ${i+1} 筆配送方式或盒數不正確`);
     const name=safeStr(line.name,60),phone=safeStr(line.phone,30),address=safeStr(line.address,200);
     if(type==='宅配'&&(!name||!phone||!address)) throw new Error(`第 ${i+1} 筆收件資訊不完整`);
+    if(type==='宅配') validateMainlandAddress(address,i);
     const pieces=type==='宅配'?Math.ceil(qty/settings.boxesPerPiece):0;
     const shipping=type==='宅配'?pieces*settings.shippingPerPiece:settings.pickupShipping;
     return {type,qty,name,phone,address:type==='宅配'?address:'',pieces,shipping,goods:qty*settings.price,note:safeStr(line.note,300),requestedDate:safeStr(line.requestedDate,20),requestedTime:safeStr(line.requestedTime,40)};
@@ -46,7 +62,7 @@ async function settings(t){
   const price=positiveInt(map['砂糖橘每盒售價']),boxesPerPiece=positiveInt(map['每件最多盒數']);
   const shippingPerPiece=numeric(map['每件宅配運費']),pickupShipping=numeric(map['自取運費']);
   if(!price||!boxesPerPiece||shippingPerPiece===null||pickupShipping===null) throw new Error('系統設定內容不完整，請檢查 A1:B5');
-  return {price,boxesPerPiece,shippingPerPiece,pickupShipping};
+  return {price,boxesPerPiece,shippingPerPiece,pickupShipping,shippingNotice:shippingNotice({boxesPerPiece,shippingPerPiece})};
 }
 // 管理動作依「配送編號」定位，不依試算表列號，避免排序後誤改他人訂單。
 const sheetCol=(n)=>{let x=n+1,s='';while(x){x--;s=String.fromCharCode(65+x%26)+s;x=Math.floor(x/26)}return s};
@@ -402,6 +418,7 @@ async function notifyLineOrder(user, result, payload) {
     `💰 商品金額｜NT$ ${money(result.goods)}`,
     `🚚 運費合計｜NT$ ${money(result.shipping)}`,
     `💵 訂單總額｜NT$ ${money(result.total)}`,
+    ...(payload.deliveries?.some(line => line.type === '宅配') ? ['🚚 配送範圍｜台灣本島，新竹貨運配送；離島請先聯繫我們。'] : []),
     '',
     ...deliveryDetails,
     '💛 目前不需要付款',

@@ -489,8 +489,15 @@ if (source === '後台手動輸入') {
     }
     if(req.method==='GET'&&action==='getOrders'){
       await requireAdmin(req);const t=await accessToken();
-      const [orders,details,payments]=await Promise.all([read(t,'訂單總表!A2:U'),read(t,'配送明細!A2:S'),read(t,'收款紀錄!A2:L')]);
-      return send(res,200,{status:'success',orders,details,payments,settings:await settings(t)});
+      // X 欄（索引 23）：客戶來源，由試算表公式維護；只讀取，不覆寫。
+      const [orders,details,payments]=await Promise.all([read(t,'訂單總表!A2:X'),read(t,'配送明細!A2:S'),read(t,'收款紀錄!A2:L')]);
+      // 複選下拉選單以逗號分隔；保留分類名稱中的頓號「、」。
+      const customerSourcesByOrder = Object.fromEntries(orders.map(row => [
+        row[0], [...new Set(String(row[23] || '').split(/[,，\r\n]+/).map(x => x.trim()).filter(Boolean))]
+      ]));
+      const customerSourceOptions = [...new Set(Object.values(customerSourcesByOrder).flat())]
+        .filter(x => x !== '待分類').sort((a,b) => a.localeCompare(b, 'zh-Hant'));
+      return send(res,200,{status:'success',orders,details,payments,customerSourcesByOrder,customerSourceOptions,settings:await settings(t)});
     }
     if(req.method==='POST'&&['setShipDate','markPaid','markShipped'].includes(action)){
       await requireAdmin(req);const t=await accessToken();
